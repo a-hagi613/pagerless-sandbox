@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout
+  namespace: sandbox
+  labels:
+    app.kubernetes.io/name: checkout
+    app.kubernetes.io/part-of: pagerless-sandbox
+  annotations:
+    pagerless.dev/source-path: workloads/checkout/deployment.yaml
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: checkout
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: checkout
+    spec:
+      containers:
+        - name: checkout
+          image: python:3.14.10-alpine3.24@sha256:5862d971d1f0ae26b258cefa4e893556b1d3aba81bd2ff30888704ad378bab67
+          command:
+            - python
+            - -c
+            - "import time; held = bytearray(48 * 1024 * 1024); time.sleep(10 ** 9)"
+          resources:
+            requests:
+              memory: 64Mi
+            limits:
+              memory: 128Mi

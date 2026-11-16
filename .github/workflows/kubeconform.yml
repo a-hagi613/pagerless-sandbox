@@ -1,0 +1,22 @@
+name: kubeconform
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  kubeconform:
+    name: kubeconform
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install kubeconform v0.8.0
+        run: |
+          curl -fsSLO https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
+          echo "9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883  kubeconform-linux-amd64.tar.gz" | sha256sum --check --strict
+          tar -xzf kubeconform-linux-amd64.tar.gz kubeconform
+          sudo install -m 0755 kubeconform /usr/local/bin/kubeconform
+      - name: Validate workloads against Kubernetes 1.37.0
+        run: kubeconform -strict -summary -kubernetes-version 1.37.0 workloads
