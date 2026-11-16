@@ -27,6 +27,6 @@ spec:
             - "import time; held = bytearray(48 * 1024 * 1024); time.sleep(10 ** 9)"
           resources:
             requests:
-              memory: 64Mi
+              memory: 32Mi
             limits:
-              memory: 128Mi
+              memory: 32Mi
