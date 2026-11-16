@@ -4,6 +4,15 @@ Demo Workloads for [Pagerless](https://github.com/a-hagi613/pagerless). Argo CD 
 
 This repository is a GitHub template. Create your own copy, then point Pagerless at it with `SANDBOX_URL` in the `.env` file that `make up` writes.
 
+### Setting up your copy
+
+Repository settings and branch protection are not copied with a template, so configure your copy after creating it:
+
+1. Enable auto-merge in the repository settings (Settings, General, Pull Requests).
+2. Add a branch protection rule for `main` that requires the `kubeconform` status check. Pagerless opens pull requests with auto-merge, so this rule is what makes them wait for validation.
+3. Allow force pushes for `main` if you want `make reset` to work without an administrator bypass.
+4. Create the `known-good` tag on the commit in which every Workload is healthy.
+
 ## Layout
 
 | Path | Contents |
