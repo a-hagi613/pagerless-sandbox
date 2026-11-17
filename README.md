@@ -23,6 +23,8 @@ The collector's agent ports are container ports only. The chart normally publish
 
 The chart's default `flagd-ui` sidecar is also dropped. It serves a browser page for editing flags, which no Scenario uses, and it carries a hardcoded high-entropy session secret that must not enter a public repository. Scenarios change flags by committing to `flagd-config`.
 
+The `flagd` Deployment mounts that ConfigMap at `/etc/flagd` read-only, rather than copying it into an emptyDir. Kubelet refreshes a mounted ConfigMap, so a merged change reaches the running flagd process without a pod restart and the SDK services pick up the new flags. `hack/check.py` fails if an init-container copy or an emptyDir mount returns.
+
 ## Layout
 
 | Path | Contents |
