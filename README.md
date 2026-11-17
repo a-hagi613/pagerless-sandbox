@@ -19,6 +19,8 @@ The Workloads are a trimmed [OpenTelemetry Demo](https://opentelemetry.io/docs/d
 
 The subset is fixed by ADR-0019 in the Pagerless repository. Ad, recommendation, accounting, fraud detection, image provider, chatbot, MCP, opamp-server, agent and telemetry-docs are disabled, as are the demo's own Jaeger, Prometheus, Grafana and OpenSearch, because the Pagerless platform provides observability. The 15 Deployments declare 3.3 GiB of memory limits in total, and the collector declares 400 MiB on each node.
 
+The collector's agent ports are container ports only. The chart normally publishes 4317, 4318, 6831, 9411, 14250 and 14268 as node host ports as well, but the Pagerless platform's own collector DaemonSet owns those ports, and a single-node kind cluster can schedule only one DaemonSet per host port. `hack/render-values.yaml` therefore removes the host ports; the demo pods reach the collector through its Service.
+
 The chart's default `flagd-ui` sidecar is also dropped. It serves a browser page for editing flags, which no Scenario uses, and it carries a hardcoded high-entropy session secret that must not enter a public repository. Scenarios change flags by committing to `flagd-config`.
 
 ## Layout

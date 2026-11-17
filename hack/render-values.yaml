@@ -111,3 +111,24 @@ grafana:
   enabled: false
 opensearch:
   enabled: false
+
+# The agent collector reaches the demo over its Service, so it needs the
+# container ports and not the node ports. The chart publishes both, but the
+# Pagerless platform's own collector DaemonSet already owns 4317, 4318, 6831,
+# 9411, 14250 and 14268 on every node, and a single-node kind cluster can
+# schedule only one DaemonSet per host port. A null value removes the key, and
+# the chart renders a host port only when it is set.
+opentelemetry-collector:
+  ports:
+    jaeger-compact:
+      hostPort: null
+    jaeger-grpc:
+      hostPort: null
+    jaeger-thrift:
+      hostPort: null
+    otlp:
+      hostPort: null
+    otlp-http:
+      hostPort: null
+    zipkin:
+      hostPort: null
