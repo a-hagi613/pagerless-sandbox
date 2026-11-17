@@ -90,18 +90,21 @@ components:
     # hardcoded high-entropy session secret that must not enter this public
     # repository, so it is dropped along with its 250Mi limit and Service port.
     sidecarContainers: []
-    initContainers:
-      - name: init-config
-        image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
-        command:
-          - sh
-          - -c
-          - cp /config-ro/demo.flagd.json /config-rw/demo.flagd.json && cat /config-rw/demo.flagd.json
-        volumeMounts:
-          - mountPath: /config-ro
-            name: config-ro
-          - mountPath: /config-rw
-            name: config-rw
+    # The chart copies flagd-config into an emptyDir with an init container, so a
+    # merged ConfigMap change never reaches the running process and the flags
+    # only change after a pod restart. Mounting the ConfigMap read-only at the
+    # path the command reads lets kubelet refresh the file, and flagd's file sync
+    # then reloads the flags that the SDK services subscribe to.
+    initContainers: []
+    mountedEmptyDirs: []
+    additionalVolumes:
+      - name: config
+        configMap:
+          name: flagd-config
+    additionalVolumeMounts:
+      - name: config
+        mountPath: /etc/flagd
+        readOnly: true
 
 jaeger:
   enabled: false

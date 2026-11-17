@@ -26,6 +26,7 @@ SOURCE_PATH = "pagerless.dev/source-path"
 DEPENDS_ON_PATHS = "pagerless.dev/depends-on-paths"
 FLAGD_CONFIG = "workloads/configmaps/flagd-config.yaml"
 FLAGD_KEY = "demo.flagd.json"
+FLAGD_MOUNT_PATH = "/etc/flagd"
 FLAGD_DEPENDENTS = ("cart", "email", "payment", "product-catalog")
 
 WORKLOAD_KINDS = ("Deployment", "StatefulSet")
@@ -118,11 +119,47 @@ def check_annotations(found: dict[tuple[str, str], tuple[str, dict]]) -> None:
         raise CheckError(f"the ConfigMap flagd-config has no {FLAGD_KEY} key")
 
 
+def check_flagd_mount(found: dict[tuple[str, str], tuple[str, dict]]) -> None:
+    """The flagd process must read the ConfigMap itself, not a copy of it.
+
+    Kubelet refreshes a mounted ConfigMap, and flagd's file sync reloads the
+    flags that the SDK services subscribe to. A copy made by an init container
+    would only change when the pod restarts, so a merged flag Scenario would
+    never reach the running process.
+    """
+    pod = found[("Deployment", "flagd")][1]["spec"]["template"]["spec"]
+    if pod.get("initContainers"):
+        raise CheckError(
+            "the flagd Deployment still runs an init container, so the mounted flag configuration is a copy"
+        )
+    volumes = {volume["name"]: volume for volume in pod.get("volumes") or []}
+    mounts = [
+        mount
+        for container in pod["containers"]
+        for mount in container.get("volumeMounts") or []
+        if mount.get("mountPath") == FLAGD_MOUNT_PATH
+    ]
+    if not mounts:
+        raise CheckError(f"no container mounts {FLAGD_MOUNT_PATH}")
+    for mount in mounts:
+        volume = volumes.get(mount["name"], {})
+        if volume.get("configMap", {}).get("name") != "flagd-config":
+            raise CheckError(f"{FLAGD_MOUNT_PATH} is not mounted from the flagd-config ConfigMap")
+        if mount.get("readOnly") is not True:
+            raise CheckError(f"{FLAGD_MOUNT_PATH} is not mounted read-only")
+    command = " ".join(
+        str(argument) for container in pod["containers"] for argument in container.get("command") or []
+    )
+    if f"file:./etc/flagd/{FLAGD_KEY}" not in command:
+        raise CheckError(f"the flagd command does not read ./etc/flagd/{FLAGD_KEY}")
+
+
 def main() -> int:
     found = manifests()
     check_inventory(found)
     check_placement(found)
     check_annotations(found)
+    check_flagd_mount(found)
     workloads = sum(1 for kind, _ in found if kind in WORKLOAD_KINDS)
     print(f"Checked {len(found)} objects, including {workloads} Workloads with their source paths and dependencies.")
     return 0
