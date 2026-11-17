@@ -1,0 +1,4 @@
+# The render and check scripts read and write YAML, so they need PyYAML and
+# nothing else. Pin it: hack/render.py must produce the same bytes for the same
+# chart, values and PyYAML version.
+pyyaml==6.0.3
