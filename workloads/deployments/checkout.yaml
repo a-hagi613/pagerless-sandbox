@@ -1,0 +1,116 @@
+# Rendered from the opentelemetry-demo chart 0.42.6 by hack/render.py.
+# Re-render with hack/render.py instead of editing this file.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout
+  labels:
+    helm.sh/chart: opentelemetry-demo-0.42.6
+    opentelemetry.io/name: checkout
+    app.kubernetes.io/version: 3.1.0
+    app.kubernetes.io/component: checkout
+    app.kubernetes.io/name: checkout
+    app.kubernetes.io/part-of: opentelemetry-demo
+    app.kubernetes.io/managed-by: Helm
+  namespace: sandbox
+  annotations:
+    pagerless.dev/source-path: workloads/deployments/checkout.yaml
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      opentelemetry.io/name: checkout
+  template:
+    metadata:
+      labels:
+        opentelemetry.io/name: checkout
+        app.kubernetes.io/version: 3.1.0
+        app.kubernetes.io/component: checkout
+        app.kubernetes.io/name: checkout
+      annotations:
+        resource.opentelemetry.io/service.namespace: opentelemetry-demo
+    spec:
+      serviceAccountName: demo
+      containers:
+      - name: checkout
+        image: ghcr.io/open-telemetry/demo:3.1.0-checkout
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: service
+        env:
+        - name: OTEL_SERVICE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['app.kubernetes.io/component']
+        - name: OTEL_COLLECTOR_NAME
+          value: otel-collector
+        - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+          value: cumulative
+        - name: OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION
+          value: explicit_bucket_histogram
+        - name: CHECKOUT_PORT
+          value: '8080'
+        - name: CART_ADDR
+          value: cart:8080
+        - name: CURRENCY_ADDR
+          value: currency:8080
+        - name: EMAIL_ADDR
+          value: http://email:8080
+        - name: PAYMENT_ADDR
+          value: payment:8080
+        - name: PRODUCT_CATALOG_ADDR
+          value: product-catalog:8080
+        - name: SHIPPING_ADDR
+          value: http://shipping:8080
+        - name: KAFKA_ADDR
+          value: kafka:9092
+        - name: KAFKA_TOPIC
+          value: orders
+        - name: FLAGD_HOST
+          value: flagd
+        - name: FLAGD_PORT
+          value: '8013'
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://$(OTEL_COLLECTOR_NAME):4318
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: http/protobuf
+        - name: GOMEMLIMIT
+          value: 16MiB
+        - name: OTEL_GO_X_OBSERVABILITY
+          value: 'true'
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: service.version=3.1.0,service.criticality=critical
+        resources:
+          limits:
+            memory: 32Mi
+        securityContext:
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      - name: memory-holder
+        image: python:3.14.10-alpine3.24@sha256:5862d971d1f0ae26b258cefa4e893556b1d3aba81bd2ff30888704ad378bab67
+        imagePullPolicy: IfNotPresent
+        command:
+        - python
+        - -c
+        - import time; held = bytearray(48 * 1024 * 1024); time.sleep(10 ** 9)
+        env: []
+        resources:
+          limits:
+            memory: 128Mi
+          requests:
+            memory: 64Mi
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - until nc -z -v -w30 kafka 9092; do echo waiting for kafka; sleep 2; done;
+        image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+        name: wait-for-kafka
+      volumes:
+      - name: tmp
+        emptyDir: {}

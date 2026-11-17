@@ -20,3 +20,9 @@ jobs:
           sudo install -m 0755 kubeconform /usr/local/bin/kubeconform
       - name: Validate workloads against Kubernetes 1.37.0
         run: kubeconform -strict -summary -kubernetes-version 1.37.0 workloads
+      - name: Install the pinned render dependencies
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet --requirement hack/requirements.txt
+      - name: Check the inventory, namespaces and annotations
+        run: .venv/bin/python hack/check.py

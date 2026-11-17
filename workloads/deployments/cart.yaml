@@ -1,0 +1,84 @@
+# Rendered from the opentelemetry-demo chart 0.42.6 by hack/render.py.
+# Re-render with hack/render.py instead of editing this file.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cart
+  labels:
+    helm.sh/chart: opentelemetry-demo-0.42.6
+    opentelemetry.io/name: cart
+    app.kubernetes.io/version: 3.1.0
+    app.kubernetes.io/component: cart
+    app.kubernetes.io/name: cart
+    app.kubernetes.io/part-of: opentelemetry-demo
+    app.kubernetes.io/managed-by: Helm
+  namespace: sandbox
+  annotations:
+    pagerless.dev/source-path: workloads/deployments/cart.yaml
+    pagerless.dev/depends-on-paths: workloads/configmaps/flagd-config.yaml
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      opentelemetry.io/name: cart
+  template:
+    metadata:
+      labels:
+        opentelemetry.io/name: cart
+        app.kubernetes.io/version: 3.1.0
+        app.kubernetes.io/component: cart
+        app.kubernetes.io/name: cart
+      annotations:
+        resource.opentelemetry.io/service.namespace: opentelemetry-demo
+    spec:
+      serviceAccountName: demo
+      containers:
+      - name: cart
+        image: ghcr.io/open-telemetry/demo:3.1.0-cart
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: service
+        env:
+        - name: OTEL_SERVICE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['app.kubernetes.io/component']
+        - name: OTEL_COLLECTOR_NAME
+          value: otel-collector
+        - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+          value: cumulative
+        - name: OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION
+          value: explicit_bucket_histogram
+        - name: CART_PORT
+          value: '8080'
+        - name: ASPNETCORE_URLS
+          value: http://*:$(CART_PORT)
+        - name: VALKEY_ADDR
+          value: valkey-cart:6379
+        - name: FLAGD_HOST
+          value: flagd
+        - name: FLAGD_PORT
+          value: '8013'
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://$(OTEL_COLLECTOR_NAME):4317
+        - name: OPAMP_SERVER_ENDPOINT
+          value: ws://opamp-server:4320/v1/opamp
+        - name: OPAMP_SERVER_TLS_INSECURE_SKIP_VERIFY
+          value: 'false'
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: service.version=3.1.0,service.criticality=high
+        resources:
+          limits:
+            memory: 160Mi
+        volumeMounts: null
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - until nc -z -v -w30 valkey-cart 6379; do echo waiting for valkey-cart; sleep 2; done;
+        image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+        name: wait-for-valkey-cart
+      volumes: null

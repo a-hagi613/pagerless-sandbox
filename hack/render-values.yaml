@@ -1,0 +1,113 @@
+# Values for the trimmed OpenTelemetry Demo that this repository renders.
+#
+# ADR-0019 fixes the subset: the services that the application Scenarios need,
+# their dependencies, and the collector that receives their telemetry. The
+# demo's own Jaeger, Prometheus, Grafana and OpenSearch are disabled because the
+# Pagerless platform provides observability.
+#
+# Change a value here, then run hack/render.py. Never edit workloads/ by hand.
+
+components:
+  accounting:
+    enabled: false
+  ad:
+    enabled: false
+  agent:
+    enabled: false
+  chatbot:
+    enabled: false
+  fraud-detection:
+    enabled: false
+  image-provider:
+    enabled: false
+  mcp:
+    enabled: false
+  recommendation:
+    enabled: false
+  telemetry-docs:
+    enabled: false
+  opamp-server:
+    enabled: false
+
+  # The chart's init containers use the mutable busybox tag. Each one below
+  # repeats the chart default with the image pinned by digest, because the
+  # rendered manifests are deployed without a chart that could resolve it.
+  cart:
+    initContainers:
+      - name: wait-for-valkey-cart
+        image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+        command:
+          - sh
+          - -c
+          - until nc -z -v -w30 valkey-cart 6379; do echo waiting for valkey-cart; sleep 2; done;
+  checkout:
+    initContainers:
+      - name: wait-for-kafka
+        image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+        command:
+          - sh
+          - -c
+          - until nc -z -v -w30 kafka 9092; do echo waiting for kafka; sleep 2; done;
+    # The oom Scenario holds more memory than the Workload's limit. The demo's
+    # checkout service uses 32Mi, so the buffer lives in a second container of
+    # the same pod. Its known-good request and limit are the ones that the
+    # Scenario's injection patch lowers, and that Pagerless raises again.
+    sidecarContainers:
+      - name: memory-holder
+        imageOverride:
+          repository: python
+          tag: 3.14.10-alpine3.24@sha256:5862d971d1f0ae26b258cefa4e893556b1d3aba81bd2ff30888704ad378bab67
+        command:
+          - python
+          - -c
+          - "import time; held = bytearray(48 * 1024 * 1024); time.sleep(10 ** 9)"
+        useDefault:
+          env: false
+        resources:
+          requests:
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+  product-catalog:
+    initContainers:
+      - name: wait-for-astronomy-db
+        image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+        command:
+          - sh
+          - -c
+          - until nc -z -v -w30 astronomy-db 5432; do echo waiting for astronomy-db; sleep 2; done;
+  shipping:
+    initContainers:
+      - name: wait-for-flagd
+        image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+        command:
+          - sh
+          - -c
+          - until nc -z -v -w30 flagd 8013; do echo waiting for flagd; sleep 2; done;
+  flagd:
+    # The chart's default sidecar serves a browser UI for editing flags. The
+    # Scenarios change flags through Git commits instead, and the sidecar ships a
+    # hardcoded high-entropy session secret that must not enter this public
+    # repository, so it is dropped along with its 250Mi limit and Service port.
+    sidecarContainers: []
+    initContainers:
+      - name: init-config
+        image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+        command:
+          - sh
+          - -c
+          - cp /config-ro/demo.flagd.json /config-rw/demo.flagd.json && cat /config-rw/demo.flagd.json
+        volumeMounts:
+          - mountPath: /config-ro
+            name: config-ro
+          - mountPath: /config-rw
+            name: config-rw
+
+jaeger:
+  enabled: false
+prometheus:
+  enabled: false
+grafana:
+  enabled: false
+opensearch:
+  enabled: false

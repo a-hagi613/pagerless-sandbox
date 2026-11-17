@@ -1,0 +1,23 @@
+# Rendered from the opentelemetry-demo chart 0.42.6 by hack/render.py.
+# Re-render with hack/render.py instead of editing this file.
+apiVersion: v1
+kind: Service
+metadata:
+  name: shipping
+  labels:
+    helm.sh/chart: opentelemetry-demo-0.42.6
+    opentelemetry.io/name: shipping
+    app.kubernetes.io/version: 3.1.0
+    app.kubernetes.io/component: shipping
+    app.kubernetes.io/name: shipping
+    app.kubernetes.io/part-of: opentelemetry-demo
+    app.kubernetes.io/managed-by: Helm
+  namespace: sandbox
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    name: tcp-service
+    targetPort: 8080
+  selector:
+    opentelemetry.io/name: shipping

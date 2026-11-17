@@ -1,0 +1,74 @@
+# Rendered from the opentelemetry-demo chart 0.42.6 by hack/render.py.
+# Re-render with hack/render.py instead of editing this file.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quote
+  labels:
+    helm.sh/chart: opentelemetry-demo-0.42.6
+    opentelemetry.io/name: quote
+    app.kubernetes.io/version: 3.1.0
+    app.kubernetes.io/component: quote
+    app.kubernetes.io/name: quote
+    app.kubernetes.io/part-of: opentelemetry-demo
+    app.kubernetes.io/managed-by: Helm
+  namespace: sandbox
+  annotations:
+    pagerless.dev/source-path: workloads/deployments/quote.yaml
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      opentelemetry.io/name: quote
+  template:
+    metadata:
+      labels:
+        opentelemetry.io/name: quote
+        app.kubernetes.io/version: 3.1.0
+        app.kubernetes.io/component: quote
+        app.kubernetes.io/name: quote
+      annotations:
+        resource.opentelemetry.io/service.namespace: opentelemetry-demo
+    spec:
+      serviceAccountName: demo
+      containers:
+      - name: quote
+        image: ghcr.io/open-telemetry/demo:3.1.0-quote
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: service
+        env:
+        - name: OTEL_SERVICE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['app.kubernetes.io/component']
+        - name: OTEL_COLLECTOR_NAME
+          value: otel-collector
+        - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+          value: cumulative
+        - name: OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION
+          value: explicit_bucket_histogram
+        - name: QUOTE_PORT
+          value: '8080'
+        - name: OTEL_PHP_AUTOLOAD_ENABLED
+          value: 'true'
+        - name: OTEL_PHP_INTERNAL_METRICS_ENABLED
+          value: 'true'
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://$(OTEL_COLLECTOR_NAME):4318
+        - name: IPV6_ENABLED
+          value: 'false'
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: service.version=3.1.0,service.criticality=low
+        resources:
+          limits:
+            memory: 40Mi
+        securityContext:
+          runAsGroup: 33
+          runAsNonRoot: true
+          runAsUser: 33
+        volumeMounts: null
+      volumes: null
