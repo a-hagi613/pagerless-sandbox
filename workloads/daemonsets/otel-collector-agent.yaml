@@ -46,30 +46,24 @@ spec:
         - name: jaeger-compact
           containerPort: 6831
           protocol: UDP
-          hostPort: 6831
         - name: jaeger-grpc
           containerPort: 14250
           protocol: TCP
-          hostPort: 14250
         - name: jaeger-thrift
           containerPort: 14268
           protocol: TCP
-          hostPort: 14268
         - name: metrics
           containerPort: 8888
           protocol: TCP
         - name: otlp
           containerPort: 4317
           protocol: TCP
-          hostPort: 4317
         - name: otlp-http
           containerPort: 4318
           protocol: TCP
-          hostPort: 4318
         - name: zipkin
           containerPort: 9411
           protocol: TCP
-          hostPort: 9411
         env:
         - name: MY_POD_IP
           valueFrom:
