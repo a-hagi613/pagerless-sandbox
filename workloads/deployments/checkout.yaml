@@ -101,9 +101,9 @@ spec:
         env: []
         resources:
           limits:
-            memory: 128Mi
+            memory: 32Mi
           requests:
-            memory: 64Mi
+            memory: 32Mi
       initContainers:
       - command:
         - sh
