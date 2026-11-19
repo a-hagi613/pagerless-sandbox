@@ -7,48 +7,32 @@ spec:
   project: default
   sources:
     # The product as a released artefact, never as source. The chart is
-    # oci://ghcr.io/a-hagi613/charts/pagerless, pinned to the published 1.0.0
-    # (Slice 11 moves the pin to 2.0.0 when Slice 10 releases it). Argo CD takes
-    # the registry and its namespace in repoURL and the chart name in chart; the
-    # oci:// scheme belongs to the artefact reference, not to this field.
+    # oci://ghcr.io/a-hagi613/charts/pagerless, pinned to the released 2.0.0.
+    # Argo CD takes the registry and its namespace in repoURL and the chart name
+    # in chart; the oci:// scheme belongs to the artefact reference, not to this
+    # field. The chart is standalone and needs no platform service beside it.
     - repoURL: ghcr.io/a-hagi613/charts
       chart: pagerless
-      targetRevision: 1.0.0
+      targetRevision: 2.0.0
       helm:
         releaseName: pagerless
         valueFiles:
           - $values/values/pagerless.yaml
-        parameters:
-          # The file names the upstream repository; this parameter makes the
-          # chart follow whatever SANDBOX_URL hack/bootstrap-stack.sh was given,
-          # so a fork's pull requests target the fork.
-          - name: sandbox.url
-            value: {{ required "sandbox.repoURL is required" .Values.sandbox.repoURL | quote }}
     - repoURL: {{ required "platform.repoURL is required" .Values.platform.repoURL | quote }}
       targetRevision: {{ required "platform.targetRevision is required" .Values.platform.targetRevision | quote }}
       ref: values
   destination:
     server: https://kubernetes.default.svc
     namespace: pagerless
-  # The server issues its own webhook CA at run time, and a restart stamps the
-  # pod template. Both would otherwise show as a permanent difference.
+  # Argo CD renders the chart with `helm template`, where the chart's `lookup`
+  # cannot see the live Secret and would mint a new session key on every render.
+  # The first sync creates the key; later syncs must not sign every browser out.
   ignoreDifferences:
-    - group: admissionregistration.k8s.io
-      kind: ValidatingWebhookConfiguration
-      name: pagerless-server
-      jqPathExpressions:
-        - .webhooks[].clientConfig.caBundle
-    - group: admissionregistration.k8s.io
-      kind: MutatingWebhookConfiguration
-      name: pagerless-server
-      jqPathExpressions:
-        - .webhooks[].clientConfig.caBundle
-    - group: apps
-      kind: Deployment
-      name: pagerless-server
+    - kind: Secret
+      name: pagerless-session-key
       namespace: pagerless
-      jqPathExpressions:
-        - .spec.template.metadata.annotations["kubectl.kubernetes.io/restartedAt"]
+      jsonPointers:
+        - /data
   syncPolicy:
     automated:
       prune: true

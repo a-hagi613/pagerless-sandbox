@@ -1,59 +1,40 @@
 # The chart values the showcase installs Pagerless with. platform/apps renders
-# the pagerless Application with this file through the Argo CD `$values` source,
-# and overrides sandbox.url with SANDBOX_URL from .env, so a fork needs no edit
-# here.
+# the pagerless Application with this file through the Argo CD `$values` source.
 #
-# The pin in platform/apps/templates/pagerless.yaml is the currently published
-# chart, 1.0.0, so these keys are that chart's. Slice 11 moves both to 2.0.0.
+# The pin in platform/apps/templates/pagerless.yaml is the released v2 chart,
+# 2.0.0. v2 is standalone: the chart creates the server, its Page history and its
+# read-only cluster identity, with no database, identity provider, executor,
+# agent gateway or admission webhook. These keys are that chart's.
 
-# The demo's namespace. Pagerless reads these Workloads and, after an Approval,
-# opens the pull request that changes them; it never writes to the cluster.
-workloadNamespaces:
-  - sandbox
+rbac:
+  # The showcase is one demo cluster. Cluster-wide read gives the watcher the
+  # demo's Targets and the Node conditions, and keeps /openapi/v3 validation
+  # available to a Proposal.
+  watchAllNamespaces: true
 
-agent:
-  # EKS Pod Identity supplies the model credentials to the pagerless-agent
-  # ServiceAccount (infra/agent_identity.tf), so no key exists here and no
-  # annotation is needed.
-  provider: bedrock
-  awsRegion: us-east-1
+auth:
+  mode: token
+  adminSecret:
+    # Argo CD renders the chart with `helm template`, where `lookup` cannot see
+    # the live Secret and a generated bootstrap token would rotate on every sync.
+    # hack/bootstrap-stack.sh creates pagerless-admin-secret out of band instead.
+    create: false
 
-sandbox:
-  url: https://github.com/a-hagi613/pagerless-sandbox
-  branch: main
-  readSecretName: github-read
-  writeSecretName: github-write
-
-argocd:
-  # The child Application that syncs workloads/ into the sandbox namespace:
-  # Verification reads its sync and health status.
-  application: sandbox
-  url: http://argocd-server.argocd.svc
-  secretName: argocd-read
-
-alertmanager:
-  url: http://kube-prometheus-stack-alertmanager.monitoring.svc:9093
-  secretName: pagerless-alertmanager
-
-grafana:
-  browserUrl: http://localhost:3000
-  mcpUrl: http://kube-prometheus-stack-grafana.monitoring.svc
-  # The two dashboards platform/observability/dashboards generates.
-  workloadDashboardUid: pagerless-workload
-  logsDashboardUid: pagerless-workload-logs
-
-mcp:
-  # The showcase runs neither agentgateway nor the four bundled MCP servers:
-  # the product drops them, and the chart's integrations above are reached
-  # directly.
-  bundled:
-    enabled: false
+credentials:
+  # One Secret, one key per credential: AI_BASE_URL, AI_API_KEY, AI_MODEL,
+  # GITHUB_TOKEN, GITHUB_REPO, optional GITHUB_API_URL, and the per-sender
+  # webhook keys (ALERTMANAGER_WEBHOOK_TOKEN and the optional Grafana, Datadog
+  # and generic credentials). hack/bootstrap-stack.sh creates it from .env, and
+  # values/pagerless-secrets.example.yaml documents its shape. Pagerless never
+  # writes a cluster credential into it.
+  existingSecret: pagerless-credentials
+  secretName: pagerless-credentials
 
 persistence:
-  enabled: true
+  # The append-only Page history, which survives a server restart.
   size: 1Gi
 
-secrets:
-  # hack/bootstrap-stack.sh creates the integration Secrets before the chart
-  # syncs, so Helm must not own them.
-  createPlaceholders: false
+dashboard:
+  # The Portal is reached with `kubectl port-forward`, so the cookie is scoped
+  # to localhost and is not marked Secure.
+  baseUrl: http://localhost:8080
