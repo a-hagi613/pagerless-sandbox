@@ -1,8 +1,8 @@
 # pagerless-sandbox
 
-The worked showcase for [**Pagerless**](https://github.com/a-hagi613/pagerless): the OpenTelemetry Demo shopping cart, a GitOps control plane, an observability and chaos stack, Terraform for an Amazon EKS session, ten repeatable failures, and a teardown that has to leave nothing billable behind.
+The worked showcase for [**Pagerless**](https://github.com/a-hagi613/pagerless) v2: the OpenTelemetry Demo shopping cart, a GitOps control plane, an observability and chaos stack, Terraform for an Amazon EKS session, ten repeatable failures, and a teardown that has to leave nothing billable behind.
 
-Pagerless itself — the operator, the chart, the CLI plugin, the portal and the agent — is not in this repository. The showcase installs it the way a stranger does: as a pinned OCI chart, from `platform/apps`. No product source, no local chart copy, and nothing cloned from the product repository at run time.
+Pagerless itself — the server, the agent Job, the chart, the `kubectl page` plugin and the embedded Portal — is not in this repository. The showcase installs it the way a stranger does: as a pinned OCI chart, from `platform/apps`. No product source, no local chart copy, and nothing cloned from the product repository at run time.
 
 ## How the showcase runs
 
@@ -12,23 +12,26 @@ flowchart LR
   SCEN -->|"StressChaos, 9"| K8S["Cluster namespace: sandbox"]
   REPO -->|"Argo CD auto-sync"| K8S
   K8S -->|"metrics, logs, traces"| OBS["Prometheus, Alertmanager, Loki, Tempo, Grafana"]
-  OBS -->|"opted-in alerts"| SRV["Pagerless (OCI chart)"]
-  SRV -->|"investigation + approval"| PR["Pull request against workloads/"]
-  PR -->|"kubeconform passes, auto-merge"| REPO
+  K8S -->|"Events, status"| SRV["Pagerless v2 (OCI chart)"]
+  OBS -->|"opted-in alerts"| SRV
+  SRV -->|"Page: Findings, Diagnosis, Proposal"| DEC["Portal or kubectl page"]
+  DEC -->|"approve one Proposal hash"| PR["Pull request against workloads/"]
+  PR -->|"Target Repository CI, human merge"| REPO
 ```
 
 - **`platform/`** is the Argo CD app-of-apps: Argo CD's own values, the root Application, one child Application per component, and the observability, Chaos Mesh and cloud manifests they read.
 - **`workloads/`** is the demo, committed as plain manifests so a Scenario is an ordinary reviewable commit and Argo CD needs no Helm.
-- **`infra/`** is the Terraform for the EKS session: network, cluster, Karpenter, storage, the agent's Pod Identity association, and the two keyless CI roles.
+- **`infra/`** is the Terraform for the EKS session: network, cluster, Karpenter, storage, and the two keyless CI roles.
 - **`scenarios/`** is the ten injections: nine patches against `workloads/`, and one Chaos Mesh experiment applied outside Git.
 
 ## Quick start
 
-Two paths run the same platform: a local [kind](https://kind.sigs.k8s.io/) cluster, and an Amazon EKS session. Both start from the same three values, which `make configure` prompts for and writes to the git-ignored `.env`:
+Two paths run the same platform: a local [kind](https://kind.sigs.k8s.io/) cluster, and an Amazon EKS session. Both start from the same local configuration, which `make configure` prompts for and writes to the git-ignored `.env`:
 
 - the HTTPS URL of the repository that holds `workloads/` (this repository, or your fork);
-- a fine-grained token with `Contents: read` on it;
-- a fine-grained token with `Contents: write` and `Pull requests: write` on it.
+- a fine-grained GitHub token with `Contents: read` on it, which Argo CD uses to sync;
+- a fine-grained GitHub token with `Contents: write` and `Pull requests: write` on it, which Pagerless uses to open the pull request that carries a Proposal;
+- an OpenAI-compatible model endpoint: its base URL, its API key (empty for a keyless local endpoint), and the model name.
 
 ```bash
 make configure
@@ -43,6 +46,16 @@ When it returns, the Applications are synced and the demo is healthy:
 ```bash
 kubectl --context kind-pagerless -n argocd get applications
 kubectl --context kind-pagerless -n sandbox get pods
+```
+
+The bootstrap prints the Portal's port-forward and the command that reads the bootstrap token from `pagerless-admin-secret`. Sign in with that token, or configure the terminal instead:
+
+```bash
+kubectl --context kind-pagerless -n pagerless port-forward svc/pagerless-server 8080:8080
+kubectl --context kind-pagerless -n pagerless get secret pagerless-admin-secret \
+  -o jsonpath='{.data.token}' | base64 --decode; echo
+
+kubectl page config set        # server URL and optional session token, no credential in argv
 ```
 
 Inject a failure, and restore the repository when you are done:
@@ -61,19 +74,36 @@ make down        # delete the kind cluster
 make cloud-down  # destroy the EKS session and prove nothing billable remains
 ```
 
+## The v2 flow
+
+1. **A Trigger opens a Page.** A Kubernetes Warning Event or a status transition is observed by the watcher, an opted-in alert arrives on the alert webhook, or a human asks for a Target with `kubectl page`. `pagerless.dev/watch: "true"` is the v2 alert opt-in.
+2. **One Active Page per Fingerprint.** Repeat Triggers join that Page and are counted; a Cooldown keeps a flapping failure from opening and billing a new investigation every minute.
+3. **The server investigates.** An ephemeral agent Job, with no cluster RBAC and no GitHub token, reads a bounded Context Bundle through the server's tool broker and reports Findings, a Diagnosis and a Proposal.
+4. **A human decides.** The Proposal is validated against the Target Repository and the cluster's schemas, then bound to a hash. The operator approves that exact hash in the Portal or with `kubectl page approve`; a rejection is final for the Page.
+5. **Pagerless opens one pull request.** The isolated writer opens it against the Target Repository, and that repository's Checks decide whether it may merge. Pagerless never merges, never patches the cluster and never holds a write credential for it.
+6. **Verification closes the Page.** After the merge, deterministic checks observe the Target and end the Page as `Recovered` or `NotRecovered`; the Portal and `kubectl page show` carry the evidence, the decision and who made it.
+
 ## The product is a released artefact
 
 `platform/apps/templates/pagerless.yaml` installs Pagerless from `oci://ghcr.io/a-hagi613/charts/pagerless` at the pinned `targetRevision`, with [`values/pagerless.yaml`](values/pagerless.yaml) as its values and a `$values` ref to this repository. Argo CD takes a chart's registry and namespace in `repoURL` and the chart name in `chart`, so the source reads `ghcr.io/a-hagi613/charts` with `chart: pagerless`; the `oci://` scheme belongs to the artefact reference, not to that field.
 
-The pin is **1.0.0**, the currently published chart. That chart also expects the platform services v2 drops — the Keycloak provider, the executor, and the MCP gateway — so its Application is expected to sync without becoming healthy until the pin moves to 2.0.0, the release that removes them. The showcase does not vendor those services to make an older chart run, because that would demonstrate an installation a stranger cannot perform.
+The pin is **2.0.0**, the v2 chart. That chart is standalone: it runs one `pagerless-server` Deployment, the Page history claim and a strictly read-only cluster identity, and reads its credentials from an existing Secret. It needs no database, identity provider, message broker, agent gateway, MCP server or admission webhook.
 
-Two things are therefore deliberately absent from `platform/apps`: the `pagerless-server` and `pagerless-executor` kustomize Applications, and the Keycloak, `agentgateway`, `mcp` and Gateway API CRDs Applications. The product's chart creates what it needs, and the showcase supplies only the platform around it.
+The install is configured the way a v2 operator configures it:
+
+- `auth.mode: token`. The chart does not generate the bootstrap token here, because Argo CD renders with `helm template` and would rotate it on every sync; `hack/bootstrap-stack.sh` creates `pagerless-admin-secret` once and the Portal exchanges that token for a session.
+- `credentials.existingSecret: pagerless-credentials`. One Secret, one key per credential: `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`, `GITHUB_TOKEN`, `GITHUB_REPO`, optional `GITHUB_API_URL`. [`values/pagerless-secrets.example.yaml`](values/pagerless-secrets.example.yaml) documents the shape, and nothing secret is committed.
+- `rbac.watchAllNamespaces: true`. The demo is one cluster, and cluster-wide read keeps Node evidence and `/openapi/v3` validation available.
+
+There is no `pagerless-server` or `pagerless-executor` kustomize Application, and no bundled identity provider, agent gateway, MCP server or Gateway API CRDs Application. v2 deletes those services rather than vendoring them, and the chart creates everything it needs.
+
+> The v2 alert-ingest contract is product ticket #90 (pull request #103). The showcase wires the receiver path, the Alertmanager bearer token and the `pagerless.dev/watch` opt-in exactly as that receiver implements them; if the contract changes before the chart release, the route and the labels move with it. The watcher opens Pages from Kubernetes Events and status independently.
 
 ## The Scenarios
 
 A Scenario is one repeatable failure. `make break` injects it; `make reset` restores the repository to the `known-good` tag.
 
-| # | `SCENARIO` | Workload | Fault |
+| # | `SCENARIO` | Target | Fault |
 | --- | --- | --- | --- |
 | 1 | `oom` | checkout | `memory-holder` limited below the memory it allocates |
 | 2 | `bad-config` | checkout | configuration the container refuses at start |
@@ -90,26 +120,24 @@ A Scenario is one repeatable failure. `make break` injects it; `make reset` rest
 
 ## The known-good tag
 
-The tag `known-good` marks the commit in which every Workload is healthy, and `make reset` force-resets `main` to it. The tag is never moved or re-created by this repository's scripts or CI: `hack/reset.sh` only reads it. If `workloads/` must change, move the tag only after the new commit has been verified healthy on a live cluster, and record the previous target in the commit message.
+The tag `known-good` marks the commit in which every Target is healthy, and `make reset` force-resets `main` to it. The tag is never moved or re-created by this repository's scripts or CI: `hack/reset.sh` only reads it. If `workloads/` must change, move the tag only after the new commit has been verified healthy on a live cluster, and record the previous target in the commit message.
 
 A reset rewinds `main` to that commit, which predates the platform and the CI added after it. The workflows therefore run on pull requests rather than on pushes to `main`, and a night that begins with `main` at `known-good` is a night the teardown cannot find `infra/` to destroy: land the next commit, or move the tag deliberately, before ending a session in that state.
 
 `make reset` force-pushes `main`, so the repository's settings must allow it (see [Repository settings](#repository-settings)). A reset rewinds `main` to an older commit, so the platform, `infra/` and the workflows added after the tag are absent from the branch until the next commit restores them — which is why CI runs on pull requests rather than on a push to `main`, and why a session is torn down before a reset rather than after it.
 
-A reset rewinds `main` to an older commit, so the platform, `infra/` and the CI workflows are absent from the branch until the next commit restores them. That is the tag's purpose — it restores the demo — and it is why CI runs on pull requests rather than on pushes to `main`, and why a session is torn down before a reset rather than after it.
-
 ## Layout
 
 | Path | Contents |
 | --- | --- |
-| `infra/` | Terraform: network, EKS, Karpenter, storage, the agent's Pod Identity association, and the two GitHub OIDC roles. `bootstrap/` creates the state bucket once; `ci/` creates the roles once. |
+| `infra/` | Terraform: network, EKS, Karpenter, storage, and the two GitHub OIDC roles. `bootstrap/` creates the state bucket once; `ci/` creates the roles once. |
 | `platform/argocd/` | Argo CD's own installation values. |
 | `platform/root/` | The root app-of-apps Application. |
 | `platform/apps/` | One child Application per component, including `pagerless.yaml`. |
-| `platform/observability/` | Alert rules, workload dashboards, ServiceMonitors, and the Helm values for Prometheus, Loki, Tempo and the collector. |
+| `platform/observability/` | Alert rules, Target dashboards, monitors, and the Helm values for Prometheus, Loki, Tempo and the collector. |
 | `platform/chaos-mesh/` | The Chaos Mesh values for Scenario 9. |
 | `platform/cloud/` | The Karpenter NodePool and EC2NodeClass templates and the default StorageClass. |
-| `values/` | The chart values the showcase installs with, and a keys-only example of the Secrets it expects. |
+| `values/` | The chart values the showcase installs with, and a keys-only example of the credential, admin, session and alert Secrets it expects. |
 | `scenarios/` | The ten injections. |
 | `workloads/` | The rendered demo, one file per object. |
 | `hack/` | The session lifecycle, the Scenario drivers, the teardown checks, the manifest validation, and the demo render scripts. |
@@ -127,7 +155,7 @@ The nightly teardown needs one more thing that is not a setting: the two roles i
 
 ## The demo
 
-The Workloads are a trimmed [OpenTelemetry Demo](https://opentelemetry.io/docs/demo/) 3.1.0: frontend, frontend-proxy, cart with its valkey store, checkout, payment, product-catalog with its astronomy database, email, flagd, shipping, quote, currency, kafka, and the load generator that drives them. Their telemetry goes to the OpenTelemetry Collector agent, which runs as a DaemonSet.
+The Targets are a trimmed [OpenTelemetry Demo](https://opentelemetry.io/docs/demo/) 3.1.0: frontend, frontend-proxy, cart with its valkey store, checkout, payment, product-catalog with its astronomy database, email, flagd, shipping, quote, currency, kafka, and the load generator that drives them. Their telemetry goes to the OpenTelemetry Collector agent, which runs as a DaemonSet.
 
 The subset is fixed by ADR-0019 in the product repository: ad, recommendation, accounting, fraud detection, image provider, chatbot, MCP, opamp-server, agent and telemetry-docs are disabled, as are the demo's own Jaeger, Prometheus, Grafana and OpenSearch, because this platform provides observability. The 15 Deployments declare 3.3 GiB of memory limits in total, and the collector declares 400 MiB on each node.
 
@@ -173,9 +201,9 @@ The script is deterministic: the same chart, values and PyYAML version produce t
 
 ## Annotations
 
-Every Workload declares its own manifest in `pagerless.dev/source-path`, so that Pagerless renders a change against the exact file Argo CD reads. A Workload is a Deployment or a StatefulSet; the collector is a DaemonSet and is never the target of an investigation.
+Every demo Target declares its own manifest in `pagerless.dev/source-path`, so that Pagerless renders a Proposal against the exact file Argo CD reads. A Target in this demo is a Deployment or a StatefulSet; the collector is a DaemonSet and carries no source path. v2 can also investigate Jobs, CronJobs, Pods, PVCs and Nodes, but none of those is a Scenario Target here.
 
-The `cart`, `payment`, `product-catalog` and `email` Workloads declare `workloads/configmaps/flagd-config.yaml` in `pagerless.dev/depends-on-paths`. Their feature flags come from that ConfigMap's `demo.flagd.json` key, so a Rollback may revert a commit that changed it.
+The `cart`, `payment`, `product-catalog` and `email` Targets declare `workloads/configmaps/flagd-config.yaml` in `pagerless.dev/depends-on-paths`. Their feature flags come from that ConfigMap's `demo.flagd.json` key, so a Rollback may revert a commit that changed it.
 
 ## Checks
 
@@ -183,11 +211,11 @@ Every pull request runs:
 
 | Workflow | What it proves |
 | --- | --- |
-| [`kubeconform`](.github/workflows/kubeconform.yml) | `workloads/` validates strictly against Kubernetes 1.37.0; the platform's plain objects and its two rendered charts validate against the schemas that exist for them; every Scenario patch applies; the inventory, namespaces and annotations hold. |
+| [`kubeconform`](.github/workflows/kubeconform.yml) | `make lint` passes; `workloads/` validates strictly against Kubernetes 1.37.0; the platform's plain objects and its two rendered charts validate against the schemas that exist for them; every Scenario patch applies; the inventory, namespaces and annotations hold. |
 | [`Infrastructure`](.github/workflows/infra.yml) | `terraform fmt`, `validate` and `tflint` over `infra/`, `infra/bootstrap/` and `infra/ci/`; the three credential-free teardown checks; and a read-only `terraform plan` through a keyless OIDC role. |
 | [`Nightly teardown`](.github/workflows/nightly-teardown.yml) | Not a pull request check: at 03:17 UTC it destroys any session left standing and runs the zero-residue check. |
 
-`make check` runs the manifest validation and the teardown checks locally, with the same scripts CI runs. `make cloud-check` runs the Terraform checks.
+`make lint` checks the shell and Python sources and the dashboard JSON. `make check` runs the manifest validation and the teardown checks locally, with the same scripts CI runs. `make cloud-check` runs the Terraform checks.
 
 ## The memory-holder container
 
