@@ -107,6 +107,7 @@ copy_scripts() {
 	cp "${repo_root}/hack/lib.sh" \
 		"${repo_root}/hack/versions.env" \
 		"${repo_root}/hack/cloud-down.sh" \
+		"${repo_root}/hack/cloud-karpenter-sweep.sh" \
 		"${repo_root}/hack/cloud-volume-sweep.sh" \
 		"${repo_root}/hack/cloud-teardown-check.sh" \
 		"${root}/hack/"

@@ -115,18 +115,13 @@ if kubectl --context "$CLOUD_CONTEXT" get nodes >/dev/null 2>&1; then
 	fi
 fi
 
-# Karpenter creates its own instance profile, which Terraform never records. A
-# profile that survives the session is an IAM leftover the teardown check would
-# report, so remove the ones this cluster owns.
-for profile in $(aws iam list-instance-profiles \
-	--query "InstanceProfiles[?starts_with(InstanceProfileName, '${CLOUD_CLUSTER}')].InstanceProfileName" \
-	--output text 2>/dev/null || true); do
-	for role in $(aws iam get-instance-profile --instance-profile-name "$profile" \
-		--query 'InstanceProfile.Roles[].RoleName' --output text 2>/dev/null || true); do
-		aws iam remove-role-from-instance-profile --instance-profile-name "$profile" --role-name "$role" >/dev/null 2>&1 || true
-	done
-	aws iam delete-instance-profile --instance-profile-name "$profile" >/dev/null 2>&1 || true
-done
+# 1b. Karpenter's own resources: the `instant` EC2 fleet it launches capacity
+# with and the IAM instance profile it creates per node launch. Neither is in
+# Terraform's state, so a destroy leaves both behind — a live teardown had to
+# remove exactly that pair by hand. The sweep runs before the volume sweep so a
+# fleet that still holds instances terminates them first, which releases the
+# volumes the sweep is about to look for.
+bash "$REPO_ROOT/hack/cloud-karpenter-sweep.sh"
 
 # 2. Sweep the volumes directly. The CSI driver deletes a volume asynchronously
 # when its claim is deleted, and a destroy that gets there first orphans it. The
@@ -134,32 +129,12 @@ done
 # control plane was lost before this command.
 bash "$REPO_ROOT/hack/cloud-volume-sweep.sh"
 
-# 2b. Delete the Karpenter fleets and the detached network interfaces a
-# terminated Spot node leaves behind. Neither is in Terraform's state: an
-# available `aws-K8S-*` interface keeps a security-group reference that blocks
-# the VPC destroy, and a Karpenter `instant` fleet keeps appearing in the
-# tagging index after its instances are gone. Both queries run without a
-# cluster, so they also cover a session whose control plane was lost.
-echo "Removing leftover Karpenter fleets and detached network interfaces."
-
-fleet_ids="$(
-	{
-		aws ec2 describe-fleets --region "$CLOUD_REGION" \
-			--filters "Name=tag:project,Values=pagerless" \
-			--query 'Fleets[].FleetId' --output text 2>/dev/null || true
-		aws resourcegroupstaggingapi get-resources --region "$CLOUD_REGION" \
-			--tag-filters Key=project,Values=pagerless \
-			--resource-type-filters ec2:fleet \
-			--query 'ResourceTagMappingList[].ResourceARN' --output text 2>/dev/null || true
-	} | tr -d '\r' | tr '\t' '\n' | sed 's#.*/##' | awk 'NF' | sort -u
-)"
-for fleet in $fleet_ids; do
-	echo "Deleting the EC2 fleet ${fleet}."
-	if ! aws ec2 delete-fleets --region "$CLOUD_REGION" --fleet-ids "$fleet" \
-		--terminate-instances >/dev/null 2>&1; then
-		echo "warning: the EC2 fleet ${fleet} could not be deleted; the teardown check will report it." >&2
-	fi
-done
+# 2b. Delete the detached network interfaces a terminated Spot node leaves
+# behind. They are not in Terraform's state either: an available `aws-K8S-*`
+# interface keeps a security-group reference that blocks the VPC destroy. The
+# query runs without a cluster, so it also covers a session whose control plane
+# was lost.
+echo "Removing leftover detached network interfaces."
 
 eni_ids="$(
 	{
