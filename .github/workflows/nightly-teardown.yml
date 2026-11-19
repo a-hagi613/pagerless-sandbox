@@ -48,6 +48,16 @@ jobs:
           set -euo pipefail
           terraform init -input=false
           terraform destroy -input=false -auto-approve -no-color
+      # The zero-residue check fails on anything that survives, and the destroy
+      # above cannot see either kind of Karpenter resource: its `instant` EC2
+      # fleet and the IAM instance profile it creates per node launch are outside
+      # Terraform's state. A live teardown left exactly that pair behind. The
+      # Karpenter sweep runs before the volume sweep because deleting a fleet
+      # terminates the instances that would otherwise keep a volume in use.
+      - name: Sweep the Karpenter fleets and instance profiles
+        run: |
+          set -euo pipefail
+          bash hack/cloud-karpenter-sweep.sh
       # The zero-residue check fails on any EBS volume that survives, and the
       # sweep is the only step in this workflow that can delete one: a volume the
       # CSI driver created is outside Terraform's state, so the destroy above

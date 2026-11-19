@@ -34,6 +34,7 @@ check: ## Validate every manifest, every Scenario patch, and the teardown script
 	bash hack/validate.sh
 	bash hack/cloud-down-order-check.sh
 	bash hack/cloud-down-context-test.sh
+	bash hack/cloud-karpenter-sweep-test.sh
 	bash hack/cloud-teardown-check-test.sh
 	bash hack/cloud-volume-sweep-test.sh
 
@@ -50,9 +51,11 @@ cloud-check: ## Check formatting, validation and lint of every Terraform configu
 	cd infra && terraform init -backend=false -input=false && terraform validate
 	cd infra && tflint --init && tflint --recursive
 	bash -n hack/cloud-up.sh hack/cloud-down.sh hack/cloud-teardown-check.sh hack/cloud-volume-sweep.sh \
+		hack/cloud-karpenter-sweep.sh hack/cloud-karpenter-sweep-test.sh \
 		hack/cloud-teardown-check-test.sh hack/cloud-volume-sweep-test.sh hack/bootstrap-stack.sh hack/up.sh
 	bash hack/cloud-down-order-check.sh
 	bash hack/cloud-down-context-test.sh
+	bash hack/cloud-karpenter-sweep-test.sh
 	bash hack/cloud-teardown-check-test.sh
 	bash hack/cloud-volume-sweep-test.sh
 	bash hack/render-cloud-manifest.sh platform/cloud/karpenter/ec2nodeclass.yaml pagerless pagerless-karpenter-node >/dev/null

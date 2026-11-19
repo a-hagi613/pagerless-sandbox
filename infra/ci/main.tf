@@ -186,11 +186,17 @@ data "aws_iam_policy_document" "destroy_identities" {
     ]
 
     # Karpenter names the instance profiles it creates after the cluster with an
-    # underscore, so this pattern carries no separator.
+    # underscore, so this pattern carries no separator. It also creates them
+    # under /karpenter/<region>/<cluster>/, so the ARN's resource part starts
+    # with the path rather than the name and the root pattern cannot match it;
+    # that is why the path pattern is listed separately. An orphaned Karpenter
+    # role, if one ever survives, sits under the same path.
     resources = [
       "arn:aws:iam::${var.aws_account_id}:instance-profile/${local.name_prefix}*",
+      "arn:aws:iam::${var.aws_account_id}:instance-profile/karpenter/*",
       "arn:aws:iam::${var.aws_account_id}:policy/${local.name_prefix}*",
       "arn:aws:iam::${var.aws_account_id}:role/${local.name_prefix}*",
+      "arn:aws:iam::${var.aws_account_id}:role/karpenter/*",
     ]
   }
 }
@@ -311,6 +317,19 @@ data "aws_iam_policy_document" "destroy" {
       variable = "aws:ResourceTag/project"
       values   = ["pagerless"]
     }
+  }
+
+  # Karpenter launches capacity with an `instant` EC2 Fleet, which Terraform never
+  # records. The fleet sweep deletes the ones that carry the session's tags, and
+  # DeleteFleets cannot be conditioned on a tag a fleet may not carry, so it is
+  # scoped to this Region and account instead of `*`; the sweep itself refuses
+  # untagged fleets and lets the residue check name them.
+  statement {
+    sid    = "DeleteTheSessionsFleets"
+    effect = "Allow"
+
+    actions   = ["ec2:DeleteFleets"]
+    resources = ["arn:aws:ec2:${var.aws_region}:${var.aws_account_id}:fleet/*"]
   }
 
   statement {

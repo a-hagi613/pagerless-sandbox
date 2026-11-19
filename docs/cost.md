@@ -25,13 +25,25 @@ use it.
 
 ## Proving the teardown left nothing behind
 
-`make cloud-down` ends with `hack/cloud-teardown-check.sh`, and the nightly
-teardown runs the same script after its `terraform destroy`. It fails, rather
-than passing quietly, when an AWS query fails: an account that cannot be read is
-not an empty account, and reading an error as "nothing left" is how a volume
-escapes a teardown.
+`make cloud-down` and the nightly teardown both end with
+`hack/cloud-teardown-check.sh`, after two sweeps remove what Terraform cannot
+see. The check fails, rather than passing quietly, when an AWS query fails: an
+account that cannot be read is not an empty account, and reading an error as
+"nothing left" is how a volume escapes a teardown.
 
-It looks in two places, because one of them lags:
+What the two sweeps remove, in the order the nightly runs them:
+
+| Sweep | Removes |
+| --- | --- |
+| `hack/cloud-karpenter-sweep.sh` | The `instant` EC2 Fleet Karpenter launched capacity with (deleted with `--terminate-instances`, then waited on), and the IAM instance profile it created per node launch. Neither is in Terraform's state. A role is deleted only when it is orphaned under Karpenter's own IAM path and has no policies and no other profiles; anything else is reported. |
+| `hack/cloud-volume-sweep.sh` | The EBS volumes the CSI driver provisioned, both the ones tagged `project=pagerless` and the ones carrying `kubernetes.io/created-for/pv/name`. |
+
+The Karpenter sweep runs first because deleting a fleet terminates the instances
+that would otherwise keep one of those volumes in use. `hack/cloud-down.sh` runs
+both before its `terraform destroy`; the nightly runs them after, because its
+state is already empty.
+
+The check itself looks in two places, because one of them lags:
 
 - the Resource Groups Tagging API, for everything tagged `project=pagerless`;
 - the EC2 API directly for EBS volumes, both the tagged ones and the ones the
@@ -59,9 +71,10 @@ are expected to survive and are exempt:
 
 ## Why the teardown order matters
 
-Deleting the namespaces and claims, sweeping the volumes, and only then
-destroying the stack is not cosmetic: an EBS volume is billed per GiB-month and
-is invisible to Terraform's state, so a destroy that runs first orphans it.
+Deleting the namespaces and claims, sweeping the Karpenter resources and the
+volumes, and only then destroying the stack is not cosmetic: an EBS volume is
+billed per GiB-month and a leftover fleet keeps instances running, and neither is
+visible to Terraform's state, so a destroy that runs first orphans them.
 `hack/cloud-down-order-check.sh` fails a pull request that reorders those steps,
-and the two `*-test.sh` scripts prove that the check and the sweep still treat a
-live volume as a leftover.
+and the `*-test.sh` scripts prove that the check and each sweep still treat a
+live resource as a leftover.
