@@ -243,6 +243,10 @@ data "aws_iam_policy_document" "destroy" {
       "ec2:DeleteSubnet",
       "ec2:DeleteTags",
       "ec2:DeleteVpc",
+      # The volume sweep deletes the EBS volumes the CSI driver created. They are
+      # outside this state, so terraform destroy cannot remove them, and the
+      # nightly refuses to report zero residue while one still bills.
+      "ec2:DeleteVolume",
       "ec2:DetachInternetGateway",
       "ec2:DisassociateRouteTable",
       "ec2:RevokeSecurityGroupEgress",

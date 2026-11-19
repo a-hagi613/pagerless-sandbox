@@ -64,7 +64,7 @@ Inject a failure, and restore the repository when you are done:
 make scenarios                       # list the ten Scenarios
 make break SCENARIO=oom              # commit it, wait for the merge, wait for the fault
 make break SCENARIO=cpu              # apply the Chaos Mesh experiment outside Git
-make reset                           # delete the experiment, reset main to known-good
+make reset                           # delete the experiment, restore the demo tree from known-good
 ```
 
 Tear down:
@@ -101,7 +101,7 @@ There is no `pagerless-server` or `pagerless-executor` kustomize Application, an
 
 ## The Scenarios
 
-A Scenario is one repeatable failure. `make break` injects it; `make reset` restores the repository to the `known-good` tag.
+A Scenario is one repeatable failure. `make break` injects it; `make reset` restores the paths it changed to their `known-good` contents.
 
 | # | `SCENARIO` | Target | Fault |
 | --- | --- | --- | --- |
@@ -120,11 +120,11 @@ A Scenario is one repeatable failure. `make break` injects it; `make reset` rest
 
 ## The known-good tag
 
-The tag `known-good` marks the commit in which every Target is healthy, and `make reset` force-resets `main` to it. The tag is never moved or re-created by this repository's scripts or CI: `hack/reset.sh` only reads it. If `workloads/` must change, move the tag only after the new commit has been verified healthy on a live cluster, and record the previous target in the commit message.
+The tag `known-good` marks the commit in which every Target is healthy, and `make reset` restores the demo tree to it. The tag is never moved or re-created by this repository's scripts or CI: `hack/reset.sh` only reads it. If `workloads/` must change, move the tag only after the new commit has been verified healthy on a live cluster, and record the previous target in the commit message.
 
-A reset rewinds `main` to that commit, which predates the platform and the CI added after it. The workflows therefore run on pull requests rather than on pushes to `main`, and a night that begins with `main` at `known-good` is a night the teardown cannot find `infra/` to destroy: land the next commit, or move the tag deliberately, before ending a session in that state.
+A reset restores only the paths a Scenario can change: every file a `scenarios/*/inject.patch` edits, plus every path a Target declares as `pagerless.dev/source-path` or `pagerless.dev/depends-on-paths`. Those bytes come from the tag, and the reset commits them on top of the current `main` and pushes without force. Nothing else moves, so `platform/`, `infra/`, `values/`, the workflows and the rest of `workloads/` are never deleted from the branch. When the tree already matches `known-good`, the reset commits nothing and only waits for Argo CD and replaces the flag-driven pods.
 
-`make reset` force-pushes `main`, so the repository's settings must allow it (see [Repository settings](#repository-settings)). A reset rewinds `main` to an older commit, so the platform, `infra/` and the workflows added after the tag are absent from the branch until the next commit restores them — which is why CI runs on pull requests rather than on a push to `main`, and why a session is torn down before a reset rather than after it.
+A reset therefore needs no force push, and it no longer has to precede the teardown for `infra/` to survive: `main` always carries `infra/` and the workflows, so a session can end with `make reset` and then `make cloud-down`, or with `make cloud-down` alone. A reset still needs a running cluster, because it waits for Argo CD to sync the restore.
 
 ## Layout
 
@@ -145,11 +145,12 @@ A reset rewinds `main` to that commit, which predates the platform and the CI ad
 
 ## Repository settings
 
-CI validates what it can, but three settings are repository configuration rather than files:
+CI validates what it can, but two settings are repository configuration rather than files:
 
 1. **Auto-merge** enabled (Settings, General, Pull requests), so an injection's pull request merges as soon as its check passes.
 2. **A branch protection rule on `main`** that requires the `kubeconform` status check. Every Scenario injection goes through a pull request, so this rule is what makes it wait for validation.
-3. **Force pushes allowed on `main`**, which `make reset` needs to restore `known-good`.
+
+Force pushes no longer need to be allowed on `main`: `make reset` commits the restored paths on top of `main` and pushes without force, so the rule can be turned off. This repository does not change that setting for you.
 
 The nightly teardown needs one more thing that is not a setting: the two roles in `infra/ci` applied once, and the repository named in `infra/ci/variables.tf` matching the repository the workflows run in.
 

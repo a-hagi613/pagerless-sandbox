@@ -5,9 +5,9 @@ name: Infrastructure
 # keyless OIDC role. Nothing here applies, and nothing stores an AWS key.
 #
 # The plan job runs only for pull requests from this repository, so a fork
-# cannot borrow the role. There is no push trigger: `make reset` force-pushes
-# main to the known-good tag, so a push to main can be a commit that predates
-# this workflow and the scripts it runs.
+# cannot borrow the role. There is no push trigger: the changes that touch
+# infra/ arrive as pull requests, and `make reset` pushes a restore commit that
+# changes only the demo tree.
 
 on:
   pull_request:

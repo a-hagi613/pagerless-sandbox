@@ -6,6 +6,11 @@ name: Nightly teardown
 #
 # A session must not span 03:17 UTC. `make cloud-down` is still the normal end
 # of a session; this is the backstop for the one that was forgotten.
+#
+# `workflow_dispatch` exists so the coordinator can prove this path against a
+# session that is deliberately left standing, instead of waiting for 03:17 UTC.
+# The concurrency group below keeps a manual run from overlapping a scheduled
+# one, so only one destroy can ever be in flight.
 
 on:
   schedule:
@@ -43,5 +48,17 @@ jobs:
           set -euo pipefail
           terraform init -input=false
           terraform destroy -input=false -auto-approve -no-color
+      # The zero-residue check fails on any EBS volume that survives, and the
+      # sweep is the only step in this workflow that can delete one: a volume the
+      # CSI driver created is outside Terraform's state, so the destroy above
+      # never sees it. The sweep therefore runs first, in the same order
+      # `hack/cloud-down.sh` uses, so the check proves zero rather than
+      # discovering a volume the next step would have removed.
+      - name: Sweep the EBS volumes the destroy cannot see
+        run: |
+          set -euo pipefail
+          bash hack/cloud-volume-sweep.sh
       - name: Confirm that nothing billable remains
-        run: bash hack/cloud-teardown-check.sh
+        run: |
+          set -euo pipefail
+          bash hack/cloud-teardown-check.sh

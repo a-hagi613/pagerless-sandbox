@@ -257,9 +257,15 @@ fi
 echo "The $scenario Scenario is injected."
 
 if [ -z "$alert" ]; then
+	context="${PAGERLESS_KUBE_CONTEXT:-kind-${KIND_CLUSTER_NAME}}"
 	cat <<EOF
 This Scenario has no opted-in alert rule, so start its Page yourself:
-  kubectl --context kind-${KIND_CLUSTER_NAME} page --namespace sandbox deploy/$workload
+  kubectl page new deployment/$workload --context ${context} --namespace sandbox
+
+The released plugin has no install path yet: there is no v2.0.0 GitHub Release,
+so there is no Krew manifest to install from. From a checkout of the Pagerless
+repository, the same command is:
+  pagerless/bin/kubectl-page new deployment/$workload --context ${context} --namespace sandbox
 EOF
 fi
 echo "Restore the Sandbox with: make reset"

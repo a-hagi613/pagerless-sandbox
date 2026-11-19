@@ -6,9 +6,10 @@ name: kubeconform
 # changes. The patch check is what keeps `make break` from becoming a silent
 # no-op, so this job is also the required status check on main.
 
-# `make reset` force-pushes main to the known-good tag, so a push to main is not
-# always a commit that carries this workflow or the files it validates. The pull
-# request is what CI checks; main is re-validated by the next pull request.
+# The workflow runs on pull requests rather than on pushes to main: an injection
+# is what can break a manifest, and `make reset` only commits the known-good
+# bytes of the paths a Scenario changed, so a push would re-validate a restore
+# that cannot introduce anything new.
 on:
   pull_request:
 

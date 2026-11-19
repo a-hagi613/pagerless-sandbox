@@ -38,7 +38,12 @@ apply)
 		echo "  $id"
 	done
 	echo "The payment Target is under CPU stress and its manifests are unchanged."
-	echo "Start the Page with: kubectl page --context kind-${KIND_CLUSTER_NAME} --namespace sandbox deploy/payment"
+	context="${PAGERLESS_KUBE_CONTEXT:-kind-${KIND_CLUSTER_NAME}}"
+	echo "Start the Page with:"
+	echo "  kubectl page new deployment/payment --context ${context} --namespace sandbox"
+	echo "The released plugin has no install path yet (no v2.0.0 Release, so no Krew"
+	echo "manifest). From a checkout of the Pagerless repository, use:"
+	echo "  pagerless/bin/kubectl-page new deployment/payment --context ${context} --namespace sandbox"
 	echo "Remove the experiment with: make reset"
 	;;
 clear)
