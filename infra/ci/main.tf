@@ -243,10 +243,6 @@ data "aws_iam_policy_document" "destroy" {
       "ec2:DeleteSubnet",
       "ec2:DeleteTags",
       "ec2:DeleteVpc",
-      # The volume sweep deletes the EBS volumes the CSI driver created. They are
-      # outside this state, so terraform destroy cannot remove them, and the
-      # nightly refuses to report zero residue while one still bills.
-      "ec2:DeleteVolume",
       "ec2:DetachInternetGateway",
       "ec2:DisassociateRouteTable",
       "ec2:RevokeSecurityGroupEgress",
@@ -268,6 +264,53 @@ data "aws_iam_policy_document" "destroy" {
     ]
 
     resources = ["*"]
+  }
+
+  # The volume sweep deletes the EBS volumes the CSI driver created. They are
+  # outside this state, so terraform destroy cannot remove them, and the nightly
+  # refuses to report zero residue while one still bills. The sweep is the only
+  # caller, and it must not widen the rest of this role: DeleteVolume is granted
+  # on one action, in one Region, and only for volumes carrying a tag the session
+  # itself put there. Two tags identify a session volume and either is enough:
+  #
+  #   - the driver tags every volume it creates with ebs.csi.aws.com/cluster=true
+  #     and documents that tag as the one to bound the driver's own delete
+  #     permission to the volumes it manages (docs/tagging.md at v1.68.0, the
+  #     add-on version infra/storage.tf pins);
+  #   - platform/cloud/storage sets tagSpecification_1=project=pagerless, so
+  #     every volume the session's default StorageClass provisions carries the
+  #     cost-allocation tag even if the driver's default tags were ever disabled.
+  #
+  # A volume without either tag is refused, which is the safe direction: the
+  # teardown check names it instead of the sweep silently deleting something the
+  # session did not create. Nothing has been observed live yet; both tags are
+  # read from the pinned driver's source and from this repository's StorageClass.
+  statement {
+    sid    = "DeleteTheSessionsCsiVolumes"
+    effect = "Allow"
+
+    actions   = ["ec2:DeleteVolume"]
+    resources = ["arn:aws:ec2:${var.aws_region}:${var.aws_account_id}:volume/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/ebs.csi.aws.com/cluster"
+      values   = ["true"]
+    }
+  }
+
+  statement {
+    sid    = "DeleteTheSessionsTaggedVolumes"
+    effect = "Allow"
+
+    actions   = ["ec2:DeleteVolume"]
+    resources = ["arn:aws:ec2:${var.aws_region}:${var.aws_account_id}:volume/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/project"
+      values   = ["pagerless"]
+    }
   }
 
   statement {
