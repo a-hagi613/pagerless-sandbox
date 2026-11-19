@@ -23,6 +23,12 @@ PLATFORM_REPO_URL="${PLATFORM_REPO_URL:-$SANDBOX_URL}"
 PLATFORM_REVISION="${PLATFORM_REVISION:-main}"
 KUBE_CONTEXT="${PAGERLESS_KUBE_CONTEXT:-kind-${KIND_CLUSTER_NAME}}"
 
+# kc() reads PAGERLESS_KUBE_CONTEXT, so export the one context this script
+# computed instead of letting a direct caller (hack/up.sh, or an operator on a
+# cloud session) fall back to a different cluster. On the kind path the value is
+# the kind context, which is what the fallback would have produced anyway.
+export PAGERLESS_KUBE_CONTEXT="$KUBE_CONTEXT"
+
 require_commands helm kubectl openssl
 require_env SANDBOX_URL GITHUB_READ_TOKEN GITHUB_WRITE_TOKEN AI_BASE_URL AI_MODEL
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com}"

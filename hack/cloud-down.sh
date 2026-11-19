@@ -25,6 +25,14 @@ CLOUD_REGION="${AWS_REGION:-us-east-1}"
 CLOUD_CLUSTER="${PAGERLESS_CLOUD_CLUSTER:-pagerless}"
 CLOUD_CONTEXT="${PAGERLESS_CLOUD_CONTEXT:-pagerless-eks}"
 
+# Every helper call below goes through kc() in hack/lib.sh, which reads
+# PAGERLESS_KUBE_CONTEXT and otherwise falls back to the local kind cluster. A
+# teardown that did not export it stopped Argo CD and then failed before
+# destroying anything, while the session kept billing. Export the context this
+# script computed, exactly as `make cloud-up` does, so the whole script targets
+# the cluster the check above proves exists.
+export PAGERLESS_KUBE_CONTEXT="$CLOUD_CONTEXT"
+
 export AWS_REGION="$CLOUD_REGION"
 
 require_commands terraform aws kubectl

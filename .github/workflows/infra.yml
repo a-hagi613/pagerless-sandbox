@@ -32,6 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           bash hack/cloud-down-order-check.sh
+          bash hack/cloud-down-context-test.sh
           bash hack/cloud-teardown-check-test.sh
           bash hack/cloud-volume-sweep-test.sh
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
