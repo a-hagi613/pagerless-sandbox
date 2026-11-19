@@ -43,7 +43,8 @@ validate -ignore-missing-schemas \
 	"$REPO_ROOT/platform/observability/monitors" \
 	"$REPO_ROOT/platform/observability/otlp-receiver" \
 	"$REPO_ROOT/platform/cloud/karpenter" \
-	"$REPO_ROOT/platform/cloud/storage"
+	"$REPO_ROOT/platform/cloud/storage" \
+	"$REPO_ROOT/platform/model-gateway"
 
 # The two charts are Go templates until Helm renders them. The values they are
 # rendered with are placeholders: rendering proves the templates and the

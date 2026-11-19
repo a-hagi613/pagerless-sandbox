@@ -31,7 +31,7 @@ Two paths run the same platform: a local [kind](https://kind.sigs.k8s.io/) clust
 - the HTTPS URL of the repository that holds `workloads/` (this repository, or your fork);
 - a fine-grained GitHub token with `Contents: read` on it, which Argo CD uses to sync;
 - a fine-grained GitHub token with `Contents: write` and `Pull requests: write` on it, which Pagerless uses to open the pull request that carries a Proposal;
-- an OpenAI-compatible model endpoint: its base URL, its API key (empty for a keyless local endpoint), and the model name.
+- an OpenAI-compatible model endpoint: its base URL, its API key (empty for a keyless local endpoint), and the model name. The showcase ships an in-cluster gateway for this (see [the model gateway](#the-model-gateway)); any other OpenAI-compatible endpoint is equally valid.
 
 ```bash
 make configure
@@ -92,8 +92,33 @@ The pin is **2.0.0**, the v2 chart. That chart is standalone: it runs one `pager
 The install is configured the way a v2 operator configures it:
 
 - `auth.mode: token`. The chart does not generate the bootstrap token here, because Argo CD renders with `helm template` and would rotate it on every sync; `hack/bootstrap-stack.sh` creates `pagerless-admin-secret` once and the Portal exchanges that token for a session.
-- `credentials.existingSecret: pagerless-credentials`. One Secret, one key per credential: `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`, `GITHUB_TOKEN`, `GITHUB_REPO`, optional `GITHUB_API_URL`. [`values/pagerless-secrets.example.yaml`](values/pagerless-secrets.example.yaml) documents the shape, and nothing secret is committed.
+- `credentials.existingSecret: pagerless-credentials`. One Secret, one key per credential: `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`, `GITHUB_TOKEN`, `GITHUB_REPO`, optional `GITHUB_API_URL`. [`values/pagerless-secrets.example.yaml`](values/pagerless-secrets.example.yaml) documents the shape, and nothing secret is committed. `hack/bootstrap-stack.sh` fills `AI_BASE_URL`/`AI_MODEL`/`AI_API_KEY` from `.env`, which points them at the gateway below.
 - `rbac.watchAllNamespaces: true`. The demo is one cluster, and cluster-wide read keeps Node evidence and `/openapi/v3` validation available.
+
+### The model gateway
+
+The demo does not depend on a model vendor. It depends on an OpenAI-compatible
+endpoint, and the showcase runs one in the cluster so a session needs no second
+account:
+
+- [`platform/model-gateway`](platform/model-gateway) is the `model-gateway`
+  Application: one LiteLLM Deployment, a ClusterIP Service on port 4000 and a
+  ConfigMap. It serves `POST /v1/chat/completions` and translates each call into
+  Bedrock's Converse API for `us.amazon.nova-2-lite-v1:0` in `us-east-1`, because
+  Nova 2 Lite has no Bedrock structured outputs and the structured Proposal comes
+  from a forced tool call.
+- Its only identity is the role in [`infra/model_gateway.tf`](infra/model_gateway.tf),
+  assumed through EKS Pod Identity from the `pagerless/model-gateway`
+  ServiceAccount. It can invoke that one model and list foundation models, and
+  it holds no key: no access key exists in Git, in a Secret, or in the image.
+- `.env` therefore carries `AI_BASE_URL=http://model-gateway.pagerless.svc.cluster.local:4000/v1`
+  and `AI_MODEL=bedrock/us.amazon.nova-2-lite-v1:0`. Any other OpenAI-compatible
+  endpoint works the same way: the product has no opinion, and nothing in the
+  chart, the Portal or the CRD refers to this gateway.
+
+[`docs/model-gateway.md`](docs/model-gateway.md) covers the request path, the
+identity, the one network-policy caveat, and the commands that prove the gateway
+answers before a session starts injecting Scenarios.
 
 There is no `pagerless-server` or `pagerless-executor` kustomize Application, and no bundled identity provider, agent gateway, MCP server or Gateway API CRDs Application. v2 deletes those services rather than vendoring them, and the chart creates everything it needs.
 
@@ -137,6 +162,7 @@ A reset therefore needs no force push, and it no longer has to precede the teard
 | `platform/observability/` | Alert rules, Target dashboards, monitors, and the Helm values for Prometheus, Loki, Tempo and the collector. |
 | `platform/chaos-mesh/` | The Chaos Mesh values for Scenario 9. |
 | `platform/cloud/` | The Karpenter NodePool and EC2NodeClass templates and the default StorageClass. |
+| `platform/model-gateway/` | The LiteLLM gateway that gives the agent an OpenAI-compatible Bedrock endpoint. |
 | `values/` | The chart values the showcase installs with, and a keys-only example of the credential, admin, session and alert Secrets it expects. |
 | `scenarios/` | The ten injections. |
 | `workloads/` | The rendered demo, one file per object. |
