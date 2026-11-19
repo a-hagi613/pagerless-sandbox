@@ -124,7 +124,7 @@ helm template pagerless-root "$REPO_ROOT/platform/root" \
 wait_for_application root "" 600 synced
 wait_for_application sandbox "" 1200
 for app in chaos-mesh kube-prometheus-stack loki tempo opentelemetry-collector \
-	observability-alerts observability-monitors observability-dashboards; do
+	observability-alerts observability-monitors observability-dashboards model-gateway; do
 	wait_for_application "$app" "" 1800
 done
 kc -n sandbox rollout status deployment/checkout --timeout=900s

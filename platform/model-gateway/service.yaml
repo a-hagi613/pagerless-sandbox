@@ -1,0 +1,21 @@
+# The endpoint the Pagerless credentials Secret points AI_BASE_URL at, as
+# http://model-gateway.pagerless.svc.cluster.local:4000/v1. ClusterIP only: the
+# gateway holds a Bedrock-invoking identity, so it is never published outside the
+# cluster and has no Ingress.
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-gateway
+  namespace: pagerless
+  labels:
+    app.kubernetes.io/name: model-gateway
+    app.kubernetes.io/part-of: pagerless-sandbox
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: model-gateway
+  ports:
+    - name: http
+      port: 4000
+      targetPort: http
+      protocol: TCP

@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: model-gateway
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # A sandbox component, not a product one: it exists so the showcase has an
+    # OpenAI-compatible endpoint for the agent, and it is installed the same way
+    # every other platform directory is. The product is unaware of it and works
+    # against any OpenAI-compatible endpoint.
+    repoURL: {{ required "platform.repoURL is required" .Values.platform.repoURL | quote }}
+    targetRevision: {{ required "platform.targetRevision is required" .Values.platform.targetRevision | quote }}
+    path: platform/model-gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pagerless
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # The pagerless Application also creates this namespace; whichever syncs
+      # first may be this one.
+      - CreateNamespace=true

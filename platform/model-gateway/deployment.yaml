@@ -1,0 +1,96 @@
+# One LiteLLM pod that serves OpenAI `/v1/chat/completions` on port 4000 and signs
+# Bedrock Converse calls with the credentials EKS Pod Identity injects for the
+# `model-gateway` ServiceAccount. No AWS key exists in this manifest, in a Secret,
+# or in the image: the identity is infra/model_gateway.tf's role, and only this
+# namespace and ServiceAccount name can assume it.
+#
+# The image is pinned to a released version rather than `main-stable` or `latest`,
+# so a recreated session runs the same gateway it ran before.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-gateway
+  namespace: pagerless
+  labels:
+    app.kubernetes.io/name: model-gateway
+    app.kubernetes.io/part-of: pagerless-sandbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: model-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: model-gateway
+        app.kubernetes.io/part-of: pagerless-sandbox
+    spec:
+      serviceAccountName: model-gateway
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: litellm
+          image: ghcr.io/berriai/litellm:main-v1.34.4
+          args:
+            - --config
+            - /etc/litellm/config.yaml
+            - --host
+            - 0.0.0.0
+            - --port
+            - "4000"
+          ports:
+            - name: http
+              containerPort: 4000
+              protocol: TCP
+          env:
+            # The model_list entry names the Region too; the environment makes
+            # the SDK's own Region resolution agree with it.
+            - name: AWS_REGION
+              value: us-east-1
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+          startupProbe:
+            httpGet:
+              path: /health/liveliness
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 36
+          livenessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # LiteLLM is a Python process that mostly waits on Bedrock, so it needs
+          # memory more than CPU. The limits keep it from competing with the demo
+          # on a shared node.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: config
+              mountPath: /etc/litellm
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: model-gateway

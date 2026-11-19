@@ -1,0 +1,38 @@
+# LiteLLM's configuration. The showcase's Pagerless agent speaks the OpenAI
+# protocol and cannot sign a SigV4 request, and Amazon Bedrock speaks neither
+# OpenAI nor plain InvokeModel for Nova's tool call, so this gateway translates
+# OpenAI `/v1/chat/completions` into Bedrock's Converse API.
+#
+#   model_name    is the alias the agent asks for; it is the value of AI_MODEL,
+#                 so it must keep the product's `bedrock/<model id>` spelling.
+#   litellm_params.model
+#                 selects the transport. `bedrock/converse/` is required: Nova 2
+#                 Lite has no Bedrock structured outputs, so the structured
+#                 Proposal is produced through a forced tool call on Converse
+#                 (ADR-0023 in the product repository).
+#
+# No master_key is set. The Service is ClusterIP-only and cluster-internal, and
+# the agent carries no second credential for a model endpoint; adding a key here
+# would mean storing one in a manifest for no security gain, because every pod in
+# the cluster could read this ConfigMap.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: model-gateway
+  namespace: pagerless
+  labels:
+    app.kubernetes.io/name: model-gateway
+    app.kubernetes.io/part-of: pagerless-sandbox
+data:
+  config.yaml: |
+    model_list:
+      - model_name: bedrock/us.amazon.nova-2-lite-v1:0
+        litellm_params:
+          model: bedrock/converse/us.amazon.nova-2-lite-v1:0
+          aws_region_name: us-east-1
+
+    # A request parameter the model does not support is dropped rather than
+    # returned as a 400, because the OpenAI client the agent uses sends a few
+    # fields that Nova ignores.
+    litellm_settings:
+      drop_params: true
