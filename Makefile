@@ -2,7 +2,7 @@
 
 include hack/versions.env
 
-.PHONY: help configure up down break reset scenarios check cloud-up cloud-down cloud-check
+.PHONY: help configure up down break reset scenarios lint check cloud-up cloud-down cloud-check
 
 help: ## List the available targets.
 	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "%-14s %s\n", $$1, $$2}'
@@ -24,6 +24,11 @@ reset: ## Force-reset the Sandbox to the known-good tag and remove chaos experim
 
 scenarios: ## List the Scenarios that scenarios/ defines.
 	@find scenarios -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
+
+lint: ## Check shell syntax, Python syntax, and the dashboard JSON documents.
+	bash -n hack/*.sh
+	@for helper in hack/*.py; do python3 -c 'import ast, sys; ast.parse(open(sys.argv[1], encoding="utf-8").read(), sys.argv[1])' "$$helper"; done
+	@for dashboard in platform/observability/dashboards/*.json; do python3 -m json.tool "$$dashboard" >/dev/null; done
 
 check: ## Validate every manifest, every Scenario patch, and the teardown scripts.
 	bash hack/validate.sh
