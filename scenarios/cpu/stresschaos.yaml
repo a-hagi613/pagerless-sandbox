@@ -1,0 +1,22 @@
+# Scenario 9 applies this object outside Git. A chaos experiment is a cluster
+# object, not a Sandbox commit, so the Workload's manifests stay at known-good
+# and no Action on the menu can fix the failure (ADR-0019).
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: cpu-stress-payment
+  namespace: sandbox
+spec:
+  # Two stressor processes burn CPU inside the payment container's cgroup, so the
+  # Service answers slowly and the load generator records errors.
+  stressors:
+    cpu:
+      workers: 2
+  mode: one
+  # The experiment outlives the five-minute investigation budget and recovers by
+  # itself if the Scenario is not reset.
+  duration: 30m
+  selector:
+    namespaces: [sandbox]
+    labelSelectors:
+      opentelemetry.io/name: payment

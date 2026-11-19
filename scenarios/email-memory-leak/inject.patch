@@ -1,0 +1,13 @@
+diff --git a/workloads/configmaps/flagd-config.yaml b/workloads/configmaps/flagd-config.yaml
+index 93e918b..96e378d 100644
+--- a/workloads/configmaps/flagd-config.yaml
++++ b/workloads/configmaps/flagd-config.yaml
+@@ -76,7 +76,7 @@ data:
+           }
+         },
+         "emailMemoryLeak": {
+-          "defaultVariant": "off",
++          "defaultVariant": "100x",
+           "description": "Memory leak in the email service.",
+           "state": "ENABLED",
+           "variants": {

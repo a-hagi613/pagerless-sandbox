@@ -1,0 +1,13 @@
+diff --git a/workloads/configmaps/flagd-config.yaml b/workloads/configmaps/flagd-config.yaml
+index 93e918b..d227a0e 100644
+--- a/workloads/configmaps/flagd-config.yaml
++++ b/workloads/configmaps/flagd-config.yaml
+@@ -62,7 +62,7 @@ data:
+           }
+         },
+         "cartFailure": {
+-          "defaultVariant": "off",
++          "defaultVariant": "100%",
+           "description": "Fail cart service n% of the time",
+           "state": "ENABLED",
+           "variants": {

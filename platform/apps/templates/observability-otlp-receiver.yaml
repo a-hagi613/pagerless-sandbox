@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability-otlp-receiver
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: {{ required "platform.repoURL is required" .Values.platform.repoURL | quote }}
+    targetRevision: {{ required "platform.targetRevision is required" .Values.platform.targetRevision | quote }}
+    path: platform/observability/otlp-receiver
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sandbox
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: pagerless-root
+description: Renders the root Argo CD Application, which syncs the platform's child Applications from platform/apps.
+type: application
+version: 0.1.0

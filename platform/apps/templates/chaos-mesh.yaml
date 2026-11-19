@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: chaos-mesh
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    # Chaos Mesh injects the CPU stress of Scenario 9. The release version is
+    # pinned in targetRevision and in the values file's image tag.
+    - repoURL: https://charts.chaos-mesh.org
+      chart: chaos-mesh
+      targetRevision: 2.8.8
+      helm:
+        releaseName: chaos-mesh
+        valueFiles:
+          - $values/platform/chaos-mesh/values.yaml
+    - repoURL: {{ required "platform.repoURL is required" .Values.platform.repoURL | quote }}
+      targetRevision: {{ required "platform.targetRevision is required" .Values.platform.targetRevision | quote }}
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: chaos-mesh
+  # The chart issues its webhook and daemon certificates on every render, and
+  # stamps a random annotation on the two pod templates. The generated objects
+  # therefore differ on every reconciliation. They are ignored here so that the
+  # Application stays Synced instead of reissuing certificates and restarting
+  # the controller and the daemon each time.
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jqPathExpressions: [".data"]
+    - group: apps
+      kind: Deployment
+      name: chaos-mesh-controller-manager
+      jqPathExpressions: [".spec.template.metadata.annotations.rollme"]
+    - group: apps
+      kind: DaemonSet
+      name: chaos-daemon
+      jqPathExpressions: [".spec.template.metadata.annotations.rollme"]
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions: [".webhooks[].clientConfig.caBundle"]
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions: [".webhooks[].clientConfig.caBundle"]
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # The Chaos Mesh CRDs exceed the client-side apply annotation limit.
+      - ServerSideApply=true

@@ -1,0 +1,56 @@
+# The only capacity Karpenter may buy (ADR-0010).
+#
+# x86_64 Spot only, because the published images are amd64 and on-demand would
+# multiply the session cost. The limits are the budget's last mechanical guard:
+# with a 12 vCPU ceiling across three Availability Zones, a runaway stack cannot
+# create more than a few dollars of capacity in a two-hour session.
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: pagerless
+spec:
+  template:
+    metadata:
+      labels:
+        pagerless.dev/node-pool: karpenter
+    spec:
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot"]
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["c", "m", "r"]
+        # Generation 5 and later are Nitro instances whose ENI limits give the
+        # cluster DaemonSets enough pod density; an older generation such as
+        # m3.medium tops out at six pods per node and cannot host them. The
+        # large and xlarge sizes keep that headroom without buying capacity the
+        # 12 vCPU limit has to refuse.
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["4"]
+        - key: karpenter.k8s.aws/instance-size
+          operator: In
+          values: ["large", "xlarge"]
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+      expireAfter: 720h
+  limits:
+    cpu: "12"
+    memory: 24Gi
+  disruption:
+    # Consolidation is what keeps a demo of a small stack from paying for idle
+    # nodes; `consolidateAfter` is short because the session is at most two hours.
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 1m
+    budgets:
+      - nodes: "10%"
+  weight: 10

@@ -1,0 +1,25 @@
+# Chaos Mesh 2.8.8 for the CPU-stress Scenario. The chart pins every image to
+# the release tag v2.8.8; see README.md in this directory.
+images:
+  registry: ghcr.io
+  tag: v2.8.8
+
+# kind runs containerd, not Docker. The chart's own values file documents this
+# pair for kind and for any cluster that uses containerd as its CRI.
+chaosDaemon:
+  runtime: containerd
+  socketPath: /run/containerd/containerd.sock
+
+# One controller is enough for the showcase, where the chart's default of three
+# replicas would only buy availability across nodes the session does not need.
+controllerManager:
+  replicaCount: 1
+
+# Pagerless injects StressChaos objects and reads their status. The dashboard,
+# the DNS server, and the profiling endpoints are not used locally, so they are
+# disabled to keep the stack small.
+enableProfiling: false
+dashboard:
+  create: false
+dnsServer:
+  create: false

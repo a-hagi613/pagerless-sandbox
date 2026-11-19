@@ -1,0 +1,16 @@
+diff --git a/workloads/deployments/checkout.yaml b/workloads/deployments/checkout.yaml
+index ab4b463..73168d9 100644
+--- a/workloads/deployments/checkout.yaml
++++ b/workloads/deployments/checkout.yaml
+@@ -101,9 +101,9 @@ spec:
+         env: []
+         resources:
+           limits:
+-            memory: 128Mi
++            memory: 256Gi
+           requests:
+-            memory: 64Mi
++            memory: 256Gi
+       initContainers:
+       - command:
+         - sh

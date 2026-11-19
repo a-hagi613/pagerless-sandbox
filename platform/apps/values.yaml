@@ -1,0 +1,12 @@
+# Set by the root Application's Helm parameters, which hack/bootstrap-stack.sh
+# renders from .env. The platform revision is also the revision of the
+# observability values files.
+platform:
+  repoURL: ""
+  targetRevision: main
+
+# Set by the root Application's Helm parameters, which hack/bootstrap-stack.sh
+# renders from .env.
+sandbox:
+  repoURL: ""
+  targetRevision: main

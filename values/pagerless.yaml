@@ -1,0 +1,59 @@
+# The chart values the showcase installs Pagerless with. platform/apps renders
+# the pagerless Application with this file through the Argo CD `$values` source,
+# and overrides sandbox.url with SANDBOX_URL from .env, so a fork needs no edit
+# here.
+#
+# The pin in platform/apps/templates/pagerless.yaml is the currently published
+# chart, 1.0.0, so these keys are that chart's. Slice 11 moves both to 2.0.0.
+
+# The demo's namespace. Pagerless reads these Workloads and, after an Approval,
+# opens the pull request that changes them; it never writes to the cluster.
+workloadNamespaces:
+  - sandbox
+
+agent:
+  # EKS Pod Identity supplies the model credentials to the pagerless-agent
+  # ServiceAccount (infra/agent_identity.tf), so no key exists here and no
+  # annotation is needed.
+  provider: bedrock
+  awsRegion: us-east-1
+
+sandbox:
+  url: https://github.com/a-hagi613/pagerless-sandbox
+  branch: main
+  readSecretName: github-read
+  writeSecretName: github-write
+
+argocd:
+  # The child Application that syncs workloads/ into the sandbox namespace:
+  # Verification reads its sync and health status.
+  application: sandbox
+  url: http://argocd-server.argocd.svc
+  secretName: argocd-read
+
+alertmanager:
+  url: http://kube-prometheus-stack-alertmanager.monitoring.svc:9093
+  secretName: pagerless-alertmanager
+
+grafana:
+  browserUrl: http://localhost:3000
+  mcpUrl: http://kube-prometheus-stack-grafana.monitoring.svc
+  # The two dashboards platform/observability/dashboards generates.
+  workloadDashboardUid: pagerless-workload
+  logsDashboardUid: pagerless-workload-logs
+
+mcp:
+  # The showcase runs neither agentgateway nor the four bundled MCP servers:
+  # the product drops them, and the chart's integrations above are reached
+  # directly.
+  bundled:
+    enabled: false
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+secrets:
+  # hack/bootstrap-stack.sh creates the integration Secrets before the chart
+  # syncs, so Helm must not own them.
+  createPlaceholders: false

@@ -1,0 +1,20 @@
+# The demo's OpenTelemetry Collector agent already runs the span_metrics connector and
+# exports the resulting calls counter to http://prometheus:9090/api/v1/otlp, resolved in
+# its own namespace. The demo's own Prometheus is disabled (ADR-0019), so the platform
+# provides that name as an alias for the Prometheus that receives OTLP.
+#
+# An ExternalName Service is the only Service that can select pods of another namespace,
+# and the alias stays in the sandbox namespace where the collector looks it up. The port
+# is the port the collector already addresses; the OTLP receiver is served on Prometheus's
+# own web port once enableOTLPReceiver is set.
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: sandbox
+spec:
+  type: ExternalName
+  externalName: kube-prometheus-stack-prometheus.monitoring.svc.cluster.local
+  ports:
+    - name: web
+      port: 9090

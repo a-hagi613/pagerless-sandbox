@@ -1,0 +1,65 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pagerless-memory-growth
+  namespace: monitoring
+spec:
+  groups:
+    - name: pagerless.memory-growth
+      rules:
+        # A memory leak is a container that keeps growing without a restart, so the rule
+        # compares the container's working set with the same series ten minutes earlier.
+        # The threshold is a tenth of the container's own memory limit, which keeps it
+        # meaningful for a 100Mi email service and for a 1500Mi load generator alike. A
+        # tenth is what the email leak reaches in about ten minutes at the demo's load,
+        # while the demo's own steady state stays below it, and a container that is younger
+        # than fifteen minutes is ignored so that a workload's startup ramp is never read
+        # as a leak.
+        #
+        # The pod is joined to its Deployment, and the limit and the growth are grouped by
+        # that Deployment, so that the alert carries the namespace, pod and deployment
+        # labels that pagerless-server's receiver reads. A Workload that declares no memory
+        # limit has no series and is never alerted on.
+        - alert: ContainerMemoryGrowth
+          expr: |
+            (
+              max by (namespace, pod, container) (
+                container_memory_working_set_bytes{container!="", container!="POD"}
+              )
+              -
+              max by (namespace, pod, container) (
+                container_memory_working_set_bytes{container!="", container!="POD"} offset 10m
+              )
+            )
+            / on (namespace, pod, container) group_left
+            max by (namespace, pod, container) (
+              kube_pod_container_resource_limits{resource="memory"}
+            )
+            * on (namespace, pod) group_left (deployment)
+            max by (namespace, pod, deployment) (
+              max by (namespace, pod, owner_name) (
+                kube_pod_owner{owner_kind="ReplicaSet"}
+              )
+              * on (namespace, owner_name) group_left (deployment)
+              max by (namespace, owner_name, deployment) (
+                label_replace(
+                  label_replace(
+                    kube_replicaset_owner{owner_kind="Deployment"},
+                    "deployment", "$1", "owner_name", "(.+)"
+                  ),
+                  "owner_name", "$1", "replicaset", "(.+)"
+                )
+              )
+            )
+            > 0.1
+            and on (namespace, pod)
+            (
+              time() - max by (namespace, pod) (kube_pod_created) > 900
+            )
+          for: 1m
+          labels:
+            severity: warning
+            pagerless_triage: "true"
+          annotations:
+            summary: A Workload's container is growing towards its memory limit.
+            description: The working set of container {{ $labels.container }} of pod {{ $labels.namespace }}/{{ $labels.pod }} grew by more than a tenth of its memory limit in ten minutes.

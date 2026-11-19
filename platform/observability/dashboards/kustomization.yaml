@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+generatorOptions:
+  # The Grafana sidecar discovers any ConfigMap with this label, in any namespace.
+  labels:
+    grafana_dashboard: "1"
+  # A stable name keeps the provisioned dashboards easy to find and lets Argo CD update them in place.
+  disableNameSuffixHash: true
+configMapGenerator:
+  # The dashboards the Pagerless Triage detail view embeds for a Workload's metrics and logs.
+  # Their UIDs are the defaults of --grafana-workload-dashboard-uid and
+  # --grafana-logs-dashboard-uid. The Pagerless dashboard itself ships in the
+  # product's chart, because it charts the product's own metrics.
+  - name: pagerless-workload-dashboards
+    files:
+      - workload-metrics.json
+      - workload-logs.json

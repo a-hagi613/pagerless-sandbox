@@ -1,0 +1,40 @@
+# Karpenter's view of the cluster's network and identity.
+#
+# This is a template: `make cloud-up` replaces its two placeholders from the
+# Terraform outputs before it applies the document, so the cluster name and the
+# node role's name exist in one place. The tag values come from
+# infra/discovery.tf and from the EKS module's node_security_group_tags.
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+spec:
+  role: __NODE_ROLE_NAME__
+  # Every instance Karpenter launches carries the cost-allocation tag, so the
+  # teardown check can name an instance that outlived the session.
+  tags:
+    project: pagerless
+  amiSelectorTerms:
+    # The Amazon Linux 2023 EKS-optimized release for the cluster's Kubernetes
+    # version. Karpenter resolves the alias; pinning a dated alias would silently
+    # stop receiving security updates.
+    - alias: al2023@latest
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: __CLUSTER_NAME__
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: __CLUSTER_NAME__
+  metadataOptions:
+    # The nodes need no instance metadata: the Pod Identity agent issues
+    # credentials, so IMDSv2-only costs nothing.
+    httpEndpoint: enabled
+    httpTokens: required
+    httpPutResponseHopLimit: 1
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 30Gi
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
