@@ -92,7 +92,11 @@ A Scenario is one repeatable failure. `make break` injects it; `make reset` rest
 
 The tag `known-good` marks the commit in which every Workload is healthy, and `make reset` force-resets `main` to it. The tag is never moved or re-created by this repository's scripts or CI: `hack/reset.sh` only reads it. If `workloads/` must change, move the tag only after the new commit has been verified healthy on a live cluster, and record the previous target in the commit message.
 
-`make reset` force-pushes `main`, so the repository's settings must allow it (see [Repository settings](#repository-settings)).
+A reset rewinds `main` to that commit, which predates the platform and the CI added after it. The workflows therefore run on pull requests rather than on pushes to `main`, and a night that begins with `main` at `known-good` is a night the teardown cannot find `infra/` to destroy: land the next commit, or move the tag deliberately, before ending a session in that state.
+
+`make reset` force-pushes `main`, so the repository's settings must allow it (see [Repository settings](#repository-settings)). A reset rewinds `main` to an older commit, so the platform, `infra/` and the workflows added after the tag are absent from the branch until the next commit restores them — which is why CI runs on pull requests rather than on a push to `main`, and why a session is torn down before a reset rather than after it.
+
+A reset rewinds `main` to an older commit, so the platform, `infra/` and the CI workflows are absent from the branch until the next commit restores them. That is the tag's purpose — it restores the demo — and it is why CI runs on pull requests rather than on pushes to `main`, and why a session is torn down before a reset rather than after it.
 
 ## Layout
 
