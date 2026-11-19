@@ -1,0 +1,5 @@
+apiVersion: v2
+name: pagerless-apps
+description: The child Argo CD Applications of the platform. The root Application renders this chart from Git.
+type: application
+version: 0.1.0

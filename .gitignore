@@ -1,2 +1,17 @@
+# Python: the manifest render and the inventory check run from a virtualenv.
 .venv/
 __pycache__/
+
+# The local configuration of a session: the repository URL and the two tokens.
+# Nothing here is committed, and nothing here is printed by a script.
+.env
+.env.*
+
+# Terraform: the state lives in the S3 bucket, so a local state file is a
+# mistake, and the provider plugins are downloaded again by `terraform init`.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.lock.info
+crash.log
+plan.txt

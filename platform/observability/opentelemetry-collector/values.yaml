@@ -1,0 +1,41 @@
+# Values for the opentelemetry-collector chart 0.178.3, deployed as a DaemonSet so
+# that it reads the container logs of every node. Read by the Argo CD Application
+# in platform/apps/templates.
+mode: daemonset
+
+# The Kubernetes distribution includes the filelog receiver and the k8sattributes
+# processor that the presets use.
+image:
+  repository: otel/opentelemetry-collector-k8s
+
+presets:
+  # Reads /var/log/pods and attaches Kubernetes metadata, such as the namespace and
+  # the pod name, to each log record.
+  logsCollection:
+    enabled: true
+    storeCheckpoints: true
+  kubernetesAttributes:
+    enabled: true
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+config:
+  exporters:
+    # Loki accepts OTLP logs natively at /otlp.
+    otlphttp/loki:
+      endpoint: http://loki.monitoring.svc.cluster.local:3100/otlp
+    otlp/tempo:
+      endpoint: tempo.monitoring.svc.cluster.local:4317
+      tls:
+        insecure: true
+  service:
+    pipelines:
+      logs:
+        exporters: [otlphttp/loki]
+      traces:
+        exporters: [otlp/tempo]

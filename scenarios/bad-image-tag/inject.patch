@@ -1,0 +1,13 @@
+diff --git a/workloads/deployments/checkout.yaml b/workloads/deployments/checkout.yaml
+index ab4b463..3e8f932 100644
+--- a/workloads/deployments/checkout.yaml
++++ b/workloads/deployments/checkout.yaml
+@@ -34,7 +34,7 @@ spec:
+       serviceAccountName: demo
+       containers:
+       - name: checkout
+-        image: ghcr.io/open-telemetry/demo:3.1.0-checkout
++        image: ghcr.io/open-telemetry/demo:3.1.0-checkout-nonexistent
+         imagePullPolicy: IfNotPresent
+         ports:
+         - containerPort: 8080

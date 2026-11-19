@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: {{ required "platform.repoURL is required" .Values.platform.repoURL | quote }}
+    targetRevision: {{ required "platform.targetRevision is required" .Values.platform.targetRevision | quote }}
+    path: platform/apps
+    helm:
+      parameters:
+        - name: platform.repoURL
+          value: {{ required "platform.repoURL is required" .Values.platform.repoURL | quote }}
+        - name: platform.targetRevision
+          value: {{ required "platform.targetRevision is required" .Values.platform.targetRevision | quote }}
+        - name: sandbox.repoURL
+          value: {{ required "sandbox.repoURL is required" .Values.sandbox.repoURL | quote }}
+        - name: sandbox.targetRevision
+          value: {{ required "sandbox.targetRevision is required" .Values.sandbox.targetRevision | quote }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

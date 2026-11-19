@@ -1,0 +1,91 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pagerless-service-error-rate
+  namespace: monitoring
+spec:
+  groups:
+    - name: pagerless.service-errors
+      rules:
+        # The demo's OpenTelemetry Collector runs the span_metrics connector over every
+        # span and exports the resulting calls counter to this Prometheus's OTLP receiver,
+        # so the metric names and labels below are what the connector emits after
+        # Prometheus normalizes them: status.code becomes status_code, and an error span's
+        # status is the label value STATUS_CODE_ERROR, which was read from the live metric.
+        # Server spans decide the rate, so a client span that fails because its callee
+        # failed does not count against the caller a second time.
+        #
+        # The collector names every demo service after its Deployment, and it attaches
+        # k8s.deployment.name to most but not all of them, so the ratio is keyed by
+        # service.name, which every span carries. When a span carries k8s.namespace.name,
+        # that namespace is preserved; otherwise it falls back to the Sandbox namespace.
+        #
+        # Four Workloads report errors in the demo's known-good state, so a threshold over
+        # them would fire continuously and never mean anything:
+        # - frontend and frontend-proxy answer the recommendation and ad routes with an
+        #   error, because ADR-0019 does not deploy those components;
+        # - checkout and shipping report failures whenever the demo's own calls time out,
+        #   which they do for part of the load generator's checkouts on a local cluster.
+        # The Scenarios' Workloads are error-free in the known-good state, so any error
+        # rate from them is a fault.
+        #
+        # The ratio and the error rate are recorded so that the alert below stays readable;
+        # both are evaluated from the moment the rule is deployed, with no history needed.
+        - record: pagerless:service_server_error_ratio:5m
+          expr: |
+            (
+              sum by (namespace, deployment) (
+                label_replace(
+                  label_replace(
+                    label_replace(
+                      rate(traces_span_metrics_calls_total{status_code="STATUS_CODE_ERROR", span_kind="SPAN_KIND_SERVER", service_name!~"frontend|frontend-proxy|checkout|shipping"}[5m]),
+                      "deployment", "$1", "service_name", "(.+)"
+                    ),
+                    "namespace", "$1", "k8s_namespace_name", "(.+)"
+                  ),
+                  "namespace", "sandbox", "namespace", "^$"
+                )
+              )
+              /
+              sum by (namespace, deployment) (
+                label_replace(
+                  label_replace(
+                    label_replace(
+                      rate(traces_span_metrics_calls_total{span_kind="SPAN_KIND_SERVER", service_name!~"frontend|frontend-proxy|checkout|shipping"}[5m]),
+                      "deployment", "$1", "service_name", "(.+)"
+                    ),
+                    "namespace", "$1", "k8s_namespace_name", "(.+)"
+                  ),
+                  "namespace", "sandbox", "namespace", "^$"
+                )
+              )
+            )
+        - record: pagerless:service_server_errors:rate5m
+          expr: |
+            sum by (namespace, deployment) (
+              label_replace(
+                label_replace(
+                  label_replace(
+                    rate(traces_span_metrics_calls_total{status_code="STATUS_CODE_ERROR", span_kind="SPAN_KIND_SERVER", service_name!~"frontend|frontend-proxy|checkout|shipping"}[5m]),
+                    "deployment", "$1", "service_name", "(.+)"
+                  ),
+                  "namespace", "$1", "k8s_namespace_name", "(.+)"
+                ),
+                "namespace", "sandbox", "namespace", "^$"
+              )
+            )
+        # One percent of a Workload's server spans failing, at more than one error every
+        # three minutes, is a real failure rather than a blip: a single error in a quiet
+        # quarter of an hour is below both, and a flag that fails an operation reaches both
+        # within a few minutes.
+        - alert: ServiceErrorRateHigh
+          expr: |
+            pagerless:service_server_error_ratio:5m > 0.01
+            and pagerless:service_server_errors:rate5m > 0.005
+          for: 3m
+          labels:
+            severity: warning
+            pagerless_triage: "true"
+          annotations:
+            summary: A Workload's server spans are failing.
+            description: More than one percent of the server spans of Deployment {{ $labels.namespace }}/{{ $labels.deployment }} are failing, at more than one error every three minutes.

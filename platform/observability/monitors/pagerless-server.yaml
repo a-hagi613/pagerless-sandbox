@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pagerless-server
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: pagerless-server
+spec:
+  # The server runs in its own namespace, so the monitor names it explicitly.
+  namespaceSelector:
+    matchNames:
+      - pagerless
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pagerless-server
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

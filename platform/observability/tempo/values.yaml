@@ -1,0 +1,16 @@
+# Values for the tempo chart 3.2.1 from the grafana-community repository, in
+# single-binary mode. Read by the Argo CD Application in platform/apps/templates.
+replicas: 1
+
+tempo:
+  retention: 24h
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 384Mi
+
+persistence:
+  enabled: true
+  size: 2Gi

@@ -1,0 +1,13 @@
+diff --git a/workloads/deployments/checkout.yaml b/workloads/deployments/checkout.yaml
+index ab4b463..f958854 100644
+--- a/workloads/deployments/checkout.yaml
++++ b/workloads/deployments/checkout.yaml
+@@ -51,7 +51,7 @@ spec:
+         - name: OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION
+           value: explicit_bucket_histogram
+         - name: CHECKOUT_PORT
+-          value: '8080'
++          value: not-a-port
+         - name: CART_ADDR
+           value: cart:8080
+         - name: CURRENCY_ADDR

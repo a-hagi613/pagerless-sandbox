@@ -1,0 +1,111 @@
+{
+  "uid": "pagerless-workload",
+  "title": "Pagerless Workload metrics",
+  "description": "Metrics for the Workload of a Pagerless Triage, embedded in the Triage detail view.",
+  "tags": ["pagerless", "workload"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "annotations": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "label": "Namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "query": "label_values(kube_pod_info, namespace)",
+          "refId": "namespace"
+        },
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 1
+      },
+      {
+        "name": "workload",
+        "label": "Workload",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "query": "label_values(kube_pod_owner{namespace=\"$namespace\", owner_kind=~\"Deployment|StatefulSet\"}, owner_name)",
+          "refId": "workload"
+        },
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "CPU usage",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", pod=~\"$workload-.*\", container!=\"\"}[5m]))",
+          "legendFormat": "cores"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "cores", "min": 0 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 2,
+      "title": "Memory working set",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"$workload-.*\", container!=\"\"})",
+          "legendFormat": "working set"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes", "min": 0 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 3,
+      "title": "Container restarts",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\", pod=~\"$workload-.*\"}[$__rate_interval]))",
+          "legendFormat": "restarts"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 4,
+      "title": "Ready pods",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(kube_pod_status_ready{namespace=\"$namespace\", pod=~\"$workload-.*\", condition=\"true\"})",
+          "legendFormat": "ready"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    }
+  ]
+}

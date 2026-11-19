@@ -1,7 +1,15 @@
 name: kubeconform
 
+# Validates every manifest in the repository: the rendered demo Workloads, the
+# platform's plain objects, the two platform charts as Helm renders them, the
+# CPU-stress experiment, and every Scenario patch against the Workload it
+# changes. The patch check is what keeps `make break` from becoming a silent
+# no-op, so this job is also the required status check on main.
+
 on:
   pull_request:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
@@ -18,8 +26,13 @@ jobs:
           echo "9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883  kubeconform-linux-amd64.tar.gz" | sha256sum --check --strict
           tar -xzf kubeconform-linux-amd64.tar.gz kubeconform
           sudo install -m 0755 kubeconform /usr/local/bin/kubeconform
-      - name: Validate workloads against Kubernetes 1.37.0
-        run: kubeconform -strict -summary -kubernetes-version 1.37.0 workloads
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          # The same Helm the README pins, so a rendering difference is a
+          # difference in the manifests rather than in the tool.
+          version: v4.3.2
+      - name: Validate the manifests, the experiment and every Scenario patch
+        run: bash hack/validate.sh
       - name: Install the pinned render dependencies
         run: |
           python3 -m venv .venv

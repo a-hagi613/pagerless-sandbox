@@ -1,0 +1,27 @@
+# The default StorageClass, applied by `make cloud-up`.
+#
+# It is named `standard` so that every manifest that runs on kind, whose
+# local-path provisioner also calls its default class `standard`, moves to EKS
+# without a storageClassName. The kind class has no tag support, so the volume
+# tag below is a cloud-only addition and the one reason a workload could notice
+# its platform.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  fsType: ext4
+  # Every dynamically provisioned volume carries the cost-allocation tag, so a
+  # volume that outlives its claim is visible to the teardown check.
+  tagSpecification_1: project=pagerless
+# A claim that is deleted deletes its volume. Nothing here needs to survive a
+# session, and a retained volume would keep billing after the cluster is gone.
+reclaimPolicy: Delete
+# The volume is created in the node's Availability Zone, which is known only once
+# a pod is scheduled.
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true

@@ -1,0 +1,82 @@
+{
+  "uid": "pagerless-workload-logs",
+  "title": "Pagerless Workload logs",
+  "description": "Container logs for the Workload of a Pagerless Triage, embedded in the Triage detail view.",
+  "tags": ["pagerless", "workload", "logs"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "annotations": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "label": "Namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "query": "label_values(kube_pod_info, namespace)",
+          "refId": "namespace"
+        },
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 1
+      },
+      {
+        "name": "workload",
+        "label": "Workload",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "query": "label_values(kube_pod_owner{namespace=\"$namespace\", owner_kind=~\"Deployment|StatefulSet\"}, owner_name)",
+          "refId": "workload"
+        },
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Log volume",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({k8s_namespace_name=\"$namespace\", k8s_pod_name=~\"$workload-.*\"}[1m]))",
+          "legendFormat": "lines"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 2,
+      "title": "Container logs",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{k8s_namespace_name=\"$namespace\", k8s_pod_name=~\"$workload-.*\"}"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true,
+        "enableLogDetails": true
+      }
+    }
+  ]
+}
