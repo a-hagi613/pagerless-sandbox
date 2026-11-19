@@ -123,7 +123,10 @@ make cloud-down
 `make reset` restores the demo tree from `known-good` with an ordinary commit on
 `main`, so `infra/` and the workflows stay on the branch and a reset is not
 required before the teardown. A reset still needs the cluster, because it waits
-for Argo CD to sync the restore. `make cloud-down` stops Argo CD, deletes the Target namespaces and their
+for Argo CD to sync the restore, and it is one of the commands that reads
+`PAGERLESS_KUBE_CONTEXT`; `make cloud-down` derives `pagerless-eks` itself from
+`PAGERLESS_CLOUD_CONTEXT`, so a teardown does not depend on the export above.
+`make cloud-down` stops Argo CD, deletes the Target namespaces and their
 claims, sweeps the EBS volumes, removes the Karpenter fleets and detached network
 interfaces, runs `terraform destroy`, deletes the `pagerless-eks` kubeconfig
 context, and then proves with `hack/cloud-teardown-check.sh` that no billable
