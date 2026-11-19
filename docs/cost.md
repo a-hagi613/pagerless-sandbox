@@ -1,7 +1,7 @@
 # Cost
 
 A session spends money only while the EKS cluster exists: the demo, the platform
-and the Workloads are manifests, and everything the session creates is destroyed
+and the Targets are manifests, and everything the session creates is destroyed
 with it. This page covers the two questions a session leaves open: what it cost,
 and whether it left anything behind.
 

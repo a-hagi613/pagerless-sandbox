@@ -10,7 +10,7 @@ load_versions
 require_commands kind openssl
 bash "$REPO_ROOT/hack/configure.sh"
 load_env
-require_env SANDBOX_URL GITHUB_READ_TOKEN GITHUB_WRITE_TOKEN
+require_env SANDBOX_URL GITHUB_READ_TOKEN GITHUB_WRITE_TOKEN AI_BASE_URL AI_MODEL
 
 kind create cluster --name "$KIND_CLUSTER_NAME" --image "$KIND_NODE_IMAGE" --wait 180s
 

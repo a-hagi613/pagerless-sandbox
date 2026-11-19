@@ -3,7 +3,7 @@
 
 The manifests in workloads/ are generated, so the checks are about the contract
 that Pagerless depends on: the inventory of the trimmed demo, the namespace of
-every object, and the annotations that name a Workload's manifest and its
+every object, and the annotations that name a Target's manifest and its
 dependency paths. Scenario injections change resources, not this contract, so
 this script passes on an injection pull request as well.
 
@@ -80,7 +80,7 @@ def manifests() -> dict[tuple[str, str], tuple[str, dict]]:
 def check_inventory(found: dict[tuple[str, str], tuple[str, dict]]) -> None:
     workloads = sorted(name for kind, name in found if kind in WORKLOAD_KINDS)
     if workloads != sorted(EXPECTED_WORKLOADS):
-        raise CheckError(f"the Workloads are {workloads}, expected {sorted(EXPECTED_WORKLOADS)}")
+        raise CheckError(f"the Targets are {workloads}, expected {sorted(EXPECTED_WORKLOADS)}")
     daemonsets = sorted(name for kind, name in found if kind == "DaemonSet")
     if daemonsets != sorted(EXPECTED_DAEMONSETS):
         raise CheckError(f"the DaemonSets are {daemonsets}, expected {sorted(EXPECTED_DAEMONSETS)}")
@@ -105,13 +105,13 @@ def check_annotations(found: dict[tuple[str, str], tuple[str, dict]]) -> None:
         if kind in WORKLOAD_KINDS:
             declared = annotations.get(SOURCE_PATH)
             if declared != relative:
-                raise CheckError(f"Workload {name} declares {SOURCE_PATH}={declared!r}, expected {relative!r}")
+                raise CheckError(f"Target {name} declares {SOURCE_PATH}={declared!r}, expected {relative!r}")
             if name in FLAGD_DEPENDENTS and annotations.get(DEPENDS_ON_PATHS) != FLAGD_CONFIG:
-                raise CheckError(f"Workload {name} does not declare {FLAGD_CONFIG} in {DEPENDS_ON_PATHS}")
+                raise CheckError(f"Target {name} does not declare {FLAGD_CONFIG} in {DEPENDS_ON_PATHS}")
             if name not in FLAGD_DEPENDENTS and DEPENDS_ON_PATHS in annotations:
-                raise CheckError(f"Workload {name} declares {DEPENDS_ON_PATHS} without reading the flagd configuration")
+                raise CheckError(f"Target {name} declares {DEPENDS_ON_PATHS} without reading the flagd configuration")
         elif SOURCE_PATH in annotations:
-            raise CheckError(f"{kind} {name} is not a Workload but declares {SOURCE_PATH}")
+            raise CheckError(f"{kind} {name} is not a Target but declares {SOURCE_PATH}")
     flagd = found.get(("ConfigMap", "flagd-config"))
     if flagd is None:
         raise CheckError(f"the ConfigMap {FLAGD_CONFIG} is missing")
@@ -161,7 +161,7 @@ def main() -> int:
     check_annotations(found)
     check_flagd_mount(found)
     workloads = sum(1 for kind, _ in found if kind in WORKLOAD_KINDS)
-    print(f"Checked {len(found)} objects, including {workloads} Workloads with their source paths and dependencies.")
+    print(f"Checked {len(found)} objects, including {workloads} Targets with their source paths and dependencies.")
     return 0
 
 

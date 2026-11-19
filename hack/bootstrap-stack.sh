@@ -8,8 +8,8 @@
 # cloud paths from drifting.
 #
 # The caller sets the context (PAGERLESS_KUBE_CONTEXT for EKS, otherwise the
-# kind context). SANDBOX_URL, GITHUB_READ_TOKEN and GITHUB_WRITE_TOKEN come from
-# .env, which `make configure` writes.
+# kind context). SANDBOX_URL, GITHUB_READ_TOKEN, GITHUB_WRITE_TOKEN and the AI
+# endpoint come from .env, which `make configure` writes.
 set -euo pipefail
 
 # shellcheck source=hack/lib.sh
@@ -17,14 +17,15 @@ set -euo pipefail
 load_versions
 load_env
 
-# The platform charts and the demo Workloads live in this repository unless the
+# The platform charts and the demo Targets live in this repository unless the
 # showcase runs against a fork, so the platform revision follows SANDBOX_URL.
 PLATFORM_REPO_URL="${PLATFORM_REPO_URL:-$SANDBOX_URL}"
 PLATFORM_REVISION="${PLATFORM_REVISION:-main}"
 KUBE_CONTEXT="${PAGERLESS_KUBE_CONTEXT:-kind-${KIND_CLUSTER_NAME}}"
 
 require_commands helm kubectl openssl
-require_env SANDBOX_URL GITHUB_READ_TOKEN GITHUB_WRITE_TOKEN
+require_env SANDBOX_URL GITHUB_READ_TOKEN GITHUB_WRITE_TOKEN AI_BASE_URL AI_MODEL
+GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com}"
 
 # Argo CD is the control plane of the showcase, not of the product: the product
 # installs with `helm install` and knows nothing about it.
@@ -69,28 +70,45 @@ kc -n argocd create secret generic sandbox-repository \
 kc create namespace pagerless --dry-run=client -o yaml | kc apply -f -
 kc create namespace monitoring --dry-run=client -o yaml | kc apply -f -
 
-# The two fine-grained tokens of ADR-0015. They reach kubectl through file
-# descriptors, not argv.
-kc -n pagerless create secret generic github-read \
-	--from-file=token=<(printf '%s' "$GITHUB_READ_TOKEN") \
-	--dry-run=client -o yaml | kc apply -f -
-kc -n pagerless create secret generic github-write \
-	--from-file=token=<(printf '%s' "$GITHUB_WRITE_TOKEN") \
-	--dry-run=client -o yaml | kc apply -f -
-
-# Alertmanager sends opted-in alerts to the receiver with one bearer token. The
-# receiver reads it from the pagerless namespace and Alertmanager mounts the
-# same Secret from its own, so both copies are written from one generated value
-# and an existing token is reused rather than rotated on every bootstrap.
-alert_token="$(kc -n pagerless get secret pagerless-alertmanager \
+# The v2 credential contract: one Secret, one key per credential. The write
+# token reaches kubectl through a file descriptor, never argv. GITHUB_REPO is the
+# Target Repository, and GITHUB_TOKEN is the write-scoped token that carries an
+# approved Proposal.
+#
+# ALERTMANAGER_WEBHOOK_TOKEN is the one key the alert receiver authenticates:
+# v2 compares it in constant time for the Alertmanager dialect. Alertmanager
+# mounts its own copy from the monitoring namespace, so both copies are written
+# from one generated value and an existing token is reused rather than rotated
+# on every bootstrap.
+alert_token="$(kc -n monitoring get secret pagerless-alertmanager \
 	-o jsonpath='{.data.token}' 2>/dev/null | base64 --decode || true)"
 [ -n "$alert_token" ] || alert_token="$(openssl rand -hex 32)"
-for namespace in pagerless monitoring; do
-	kc -n "$namespace" create secret generic pagerless-alertmanager \
-		--from-file=token=<(printf '%s' "$alert_token") \
-		--dry-run=client -o yaml | kc apply -f -
-done
+kc -n monitoring create secret generic pagerless-alertmanager \
+	--from-file=token=<(printf '%s' "$alert_token") \
+	--dry-run=client -o yaml | kc apply -f -
+
+kc -n pagerless create secret generic pagerless-credentials \
+	--from-file=AI_BASE_URL=<(printf '%s' "$AI_BASE_URL") \
+	--from-file=AI_API_KEY=<(printf '%s' "${AI_API_KEY:-}") \
+	--from-file=AI_MODEL=<(printf '%s' "$AI_MODEL") \
+	--from-file=GITHUB_TOKEN=<(printf '%s' "$GITHUB_WRITE_TOKEN") \
+	--from-file=GITHUB_REPO=<(printf '%s' "$(sandbox_slug)") \
+	--from-file=GITHUB_API_URL=<(printf '%s' "$GITHUB_API_URL") \
+	--from-file=ALERTMANAGER_WEBHOOK_TOKEN=<(printf '%s' "$alert_token") \
+	--dry-run=client -o yaml | kc apply -f -
 unset alert_token
+
+# Argo CD cannot preserve a chart-generated bootstrap token: `lookup` is empty
+# under `helm template`, so the token would rotate on every sync. The chart is
+# told not to create it (auth.adminSecret.create: false) and this script creates
+# it once, reusing an existing token when the namespace already has one.
+admin_token="$(kc -n pagerless get secret pagerless-admin-secret \
+	-o jsonpath='{.data.token}' 2>/dev/null | base64 --decode || true)"
+[ -n "$admin_token" ] || admin_token="$(openssl rand -hex 24)"
+kc -n pagerless create secret generic pagerless-admin-secret \
+	--from-file=token=<(printf '%s' "$admin_token") \
+	--dry-run=client -o yaml | kc apply -f -
+unset admin_token
 
 # The root Application renders every child Application from platform/apps and
 # points the sandbox Application at this repository's workloads/ directory.
@@ -111,17 +129,15 @@ for app in chaos-mesh kube-prometheus-stack loki tempo opentelemetry-collector \
 done
 kc -n sandbox rollout status deployment/checkout --timeout=900s
 
-# The pagerless Application is waited on for sync only. The chart pinned in
-# platform/apps is the published 1.0.0, whose server also expects the Keycloak
-# provider and the executor this repository deliberately does not run; Slice 11
-# pins 2.0.0, which drops both. Its sync is what proves the registry, the values
-# file and the destination are right.
-wait_for_application pagerless "" 900 synced
+# The v2 chart is standalone, so the Application becomes healthy once its one
+# server pod is ready. There is no executor, identity provider or MCP gateway to
+# wait for.
+wait_for_application pagerless "" 900
 
-# Approval is bound to the identity that runs the bootstrap, so the approval
-# screen has an approver without a bundled identity provider (ADR-0020). It runs
-# after the chart sync, because the chart creates the Role it binds. The binding
-# name is derived from the identity, so a second run updates one binding.
+# Approval is bound to the identity that runs the bootstrap, so the Portal and
+# `kubectl page` have an approver without a bundled identity provider (ADR-0031).
+# It runs after the chart sync, because the chart creates the Role it binds. The
+# binding name is derived from the identity, so a second run updates one binding.
 approver="$(kc auth whoami -o jsonpath='{.status.userInfo.username}')"
 case "$approver" in
 "" | system:anonymous | system:serviceaccount:* | system:node:*)
@@ -136,11 +152,18 @@ kc -n pagerless create rolebinding "$binding" \
 
 cat <<EOF
 
-The platform is synced. The demo Workloads are in the sandbox namespace and the
+The platform is synced. The demo Targets are in the sandbox namespace and the
 observability stack is in monitoring.
 
 Open Grafana:
   kubectl --context ${KUBE_CONTEXT} -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
+
+Open the Pagerless Portal:
+  kubectl --context ${KUBE_CONTEXT} -n pagerless port-forward svc/pagerless-server 8080:8080
+  kubectl --context ${KUBE_CONTEXT} -n pagerless get secret pagerless-admin-secret -o jsonpath='{.data.token}' | base64 --decode; echo
+
+Sign in with that bootstrap token. In a terminal, the same decision path is
+\`kubectl page\`, configured with \`kubectl page config set\`.
 
 Inject a failure with: make break SCENARIO=oom
 Restore the Sandbox with: make reset

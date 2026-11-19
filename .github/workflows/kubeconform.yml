@@ -1,8 +1,8 @@
 name: kubeconform
 
-# Validates every manifest in the repository: the rendered demo Workloads, the
+# Validates every manifest in the repository: the rendered demo Targets, the
 # platform's plain objects, the two platform charts as Helm renders them, the
-# CPU-stress experiment, and every Scenario patch against the Workload it
+# CPU-stress experiment, and every Scenario patch against the Target it
 # changes. The patch check is what keeps `make break` from becoming a silent
 # no-op, so this job is also the required status check on main.
 
@@ -32,6 +32,8 @@ jobs:
           # The same Helm the README pins, so a rendering difference is a
           # difference in the manifests rather than in the tool.
           version: v4.3.2
+      - name: Lint the shell and Python sources
+        run: make lint
       - name: Validate the manifests, the experiment and every Scenario patch
         run: bash hack/validate.sh
       - name: Install the pinned render dependencies

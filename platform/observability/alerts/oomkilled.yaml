@@ -5,9 +5,9 @@ metadata:
   namespace: monitoring
 spec:
   groups:
-    - name: pagerless.workloads
+    - name: pagerless.targets
       rules:
-        # kube-state-metrics reports the pod that was OOMKilled, not its Workload. The
+        # kube-state-metrics reports the pod that was OOMKilled, not its Target. The
         # expression joins the pod to its owner: a Deployment through its ReplicaSet, or a
         # StatefulSet directly. The receiver of pagerless-server reads the deployment or
         # statefulset label, and the namespace and pod labels, from this alert.
@@ -43,7 +43,11 @@ spec:
             )
           labels:
             severity: warning
-            pagerless_triage: "true"
+            # pagerless_page selects the alert for the Alertmanager route; it is
+            # not the product opt-in. pagerless.dev/watch is the v2 opt-in the
+            # receiver checks.
+            pagerless_page: "true"
+            pagerless.dev/watch: "true"
           annotations:
-            summary: A container of a Workload was OOMKilled.
+            summary: A container of a Target was OOMKilled.
             description: The container of pod {{ $labels.namespace }}/{{ $labels.pod }} was terminated with reason OOMKilled.

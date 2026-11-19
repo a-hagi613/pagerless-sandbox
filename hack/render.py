@@ -37,9 +37,9 @@ DEPENDS_ON_PATHS = "pagerless.dev/depends-on-paths"
 FLAGD_CONFIG = "workloads/configmaps/flagd-config.yaml"
 FLAGD_DEPENDENTS = ("cart", "email", "payment", "product-catalog")
 
-# A Workload is a Deployment or a StatefulSet, so only those carry the source
+# A Target is a Deployment or a StatefulSet, so only those carry the source
 # path that Pagerless renders a change against. The collector is a DaemonSet and
-# is never the target of a Triage.
+# is never the target of a Page.
 WORKLOAD_KINDS = ("Deployment", "StatefulSet")
 CLUSTER_SCOPED_KINDS = ("ClusterRole", "ClusterRoleBinding")
 KIND_DIRECTORIES = {

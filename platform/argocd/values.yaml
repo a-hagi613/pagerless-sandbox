@@ -1,22 +1,15 @@
 # Values for the argo-cd chart 10.18.0 (Argo CD v3.6.1), used by hack/bootstrap-stack.sh.
-# The reconciliation interval is shortened so that merged Sandbox commits sync
-# within seconds (spec #1). The jitter is removed so the interval is exact.
+# The reconciliation interval is shortened so a merged commit reaches the demo
+# within seconds. The jitter is removed so the interval is exact.
 configs:
   cm:
-    accounts.pagerless: apiKey
-    accounts.pagerless.enabled: "true"
     timeout.reconciliation: 10s
     timeout.reconciliation.jitter: 0s
   params:
     server.insecure: true
-  rbac:
-    policy.default: role:pagerless-none
-    policy.csv: |
-      p, role:pagerless-read, applications, get, default/sandbox, allow
-      g, pagerless, role:pagerless-read
 
-# Phase 1 uses only the Argo CD API and controllers. SSO, notifications, and
-# ApplicationSets are not needed for the local loop.
+# The showcase uses the Argo CD API and controllers only. SSO, notifications,
+# and ApplicationSets are not needed for the local or EKS loop.
 dex:
   enabled: false
 notifications:

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Force-resets the Sandbox's main branch to the known-good tag, then waits for
-# Argo CD to sync that commit and for the Workload to become healthy again.
+# Argo CD to sync that commit and for the Target to become healthy again.
 #
 # This script reads the tag; it never creates, moves, or deletes it. The branch
 # it force-pushes is main, which is why the repository settings allow the reset

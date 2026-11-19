@@ -13,13 +13,15 @@ spec:
         # meaningful for a 100Mi email service and for a 1500Mi load generator alike. A
         # tenth is what the email leak reaches in about ten minutes at the demo's load,
         # while the demo's own steady state stays below it, and a container that is younger
-        # than fifteen minutes is ignored so that a workload's startup ramp is never read
+        # than fifteen minutes is ignored so that a Target's startup ramp is never read
         # as a leak.
         #
         # The pod is joined to its Deployment, and the limit and the growth are grouped by
         # that Deployment, so that the alert carries the namespace, pod and deployment
-        # labels that pagerless-server's receiver reads. A Workload that declares no memory
-        # limit has no series and is never alerted on.
+        # labels that pagerless-server's receiver reads. The deployment label is the
+        # single Target label the subject resolver uses; the pod label is evidence, not
+        # the Target. A Target that declares no memory limit has no series and is never
+        # alerted on.
         - alert: ContainerMemoryGrowth
           expr: |
             (
@@ -59,7 +61,11 @@ spec:
           for: 1m
           labels:
             severity: warning
-            pagerless_triage: "true"
+            # pagerless_page selects the alert for the Alertmanager route; it is
+            # not the product opt-in. pagerless.dev/watch is the v2 opt-in the
+            # receiver checks.
+            pagerless_page: "true"
+            pagerless.dev/watch: "true"
           annotations:
-            summary: A Workload's container is growing towards its memory limit.
+            summary: A Target's container is growing towards its memory limit.
             description: The working set of container {{ $labels.container }} of pod {{ $labels.namespace }}/{{ $labels.pod }} grew by more than a tenth of its memory limit in ten minutes.

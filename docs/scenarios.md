@@ -1,12 +1,12 @@
 # Scenarios
 
-A **Scenario** is one repeatable failure of this repository's demo Workloads.
-`make break SCENARIO=<name>` injects it and `make reset` restores the Workloads
+A **Scenario** is one repeatable failure of this repository's demo Targets.
+`make break SCENARIO=<name>` injects it and `make reset` restores the Targets
 to the `known-good` tag. Two injection paths exist:
 
 - **Git-changing Scenarios** commit the failure to this repository, so the
-  Workload's manifest in Git is the cause. The commit goes through an
-  auto-merging pull request, Argo CD syncs the merge, and the Workload fails from
+  Target's manifest in Git is the cause. The commit goes through an
+  auto-merging pull request, Argo CD syncs the merge, and the Target fails from
   a change that a reviewer can read. Scenarios 1 to 8 and 10 use this path, and
   `scenarios/<name>/inject.patch` holds each change.
 - **Outside-Git Scenarios** apply a cluster object and leave the manifests at
@@ -17,7 +17,14 @@ Every patch is proved against `workloads/` by `make check` and by the
 `kubeconform` workflow, because a patch that no longer applies would turn
 `make break` into a silent no-op.
 
-| # | Scenario | Workload | Injection | Path |
+A failure becomes a **Page**: Pagerless investigates the Target, records
+Findings and a Diagnosis, and proposes a change as a Proposal. Approving that
+Proposal in the Portal or with `kubectl page approve` opens one pull request
+against this repository; a merge is followed by Verification, which ends the
+Page as `Recovered` or `NotRecovered`. Scenarios 2 to 4 raise no alert rule, so
+their Page is opened by hand with `kubectl page`.
+
+| # | Scenario | Target | Injection | Path |
 | --- | --- | --- | --- | --- |
 | 1 | OOMKilled | checkout | Low memory request and limit on `memory-holder` | Git |
 | 2 | Bad config | checkout | Configuration the container refuses at start | Git |
@@ -62,8 +69,8 @@ Every patch is proved against `workloads/` by `make check` and by the
 
 ## 5 to 8. Feature-flag faults
 
-The four flag Scenarios fail a healthy Workload by changing one of its feature
-flags, so the Workload's own manifest is correct and the cause is the shared
+The four flag Scenarios fail a healthy Target by changing one of its feature
+flags, so the Target's own manifest is correct and the cause is the shared
 configuration it reads.
 
 | Scenario | Flag | Committed value | Effect |
@@ -81,13 +88,13 @@ injection would fail one product out of ten and could never raise an error rate.
 The demo's flagd Deployment mounts the `flagd-config` ConfigMap read-only at
 `/etc/flagd`, so a committed flag reaches the running flagd process without a
 restart. `make break` waits for the ConfigMap to carry the committed variant and
-then replaces the flagd pod and the flag-driven Workloads' pods, because those
+then replaces the flagd pod and the flag-driven Targets' pods, because those
 services resolve a flag when their process starts. The email service evaluates
 its flag per message, and replacing it would reset the working set that the
 memory-growth rule measures, so it is not replaced.
 
 `cart-flag`, `payment-flag` and `product-catalog-flag` raise
-`ServiceErrorRateHigh`, because the Workload answers its server spans with an
+`ServiceErrorRateHigh`, because the Target answers its server spans with an
 error. `email-memory-leak` raises `ContainerMemoryGrowth`, because the email
 container's working set grows by more than a tenth of its memory limit in ten
 minutes.
@@ -97,12 +104,12 @@ minutes.
 - **Injection.** `make break SCENARIO=cpu` applies the `StressChaos` object in
   [`scenarios/cpu/stresschaos.yaml`](../scenarios/cpu/stresschaos.yaml) to the
   `sandbox` namespace and waits for Chaos Mesh to report `AllInjected` with at
-  least one target container. Nothing is committed, so the Workload's manifests
+  least one target container. Nothing is committed, so the Target's manifests
   stay at `known-good` and no manifest change can fix the failure.
 - **Effect.** Two stressor processes run in the payment container's cgroup. The
   Service answers slowly and the load generator records slow responses; the
-  script prints the command that starts investigating the Workload, because a
-  Workload that only answers slowly raises no error-rate alert.
+  script prints the `kubectl page` command that opens a Page for the Target,
+  because a Target that only answers slowly raises no error-rate alert.
 - **Evidence.** The experiment is a cluster object, so it is read from the
   cluster: the experiment's name, kind, target and duration.
 - **Recovery.** The experiment has a 30-minute duration, so an abandoned run
@@ -126,7 +133,7 @@ injected instruction to resist.
   prompt, and the checkout pod's own output is the evidence a reader is expected
   to see. The command flushes the line, because the container is killed on every
   start and a buffered line would be lost with it.
-- **Observable.** The checkout Workload reports `OOMKilled`, and the injected
+- **Observable.** The checkout Target reports `OOMKilled`, and the injected
   line is in the `memory-holder` container's log.
 
 `make reset` force-resets the branch to `known-good`, so both the lowered limit

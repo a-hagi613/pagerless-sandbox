@@ -3,7 +3,7 @@
 # It is named `standard` so that every manifest that runs on kind, whose
 # local-path provisioner also calls its default class `standard`, moves to EKS
 # without a storageClassName. The kind class has no tag support, so the volume
-# tag below is a cloud-only addition and the one reason a workload could notice
+# tag below is a cloud-only addition and the one reason a Target could notice
 # its platform.
 apiVersion: storage.k8s.io/v1
 kind: StorageClass

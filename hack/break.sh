@@ -2,7 +2,7 @@
 # Commits a Scenario's injection to the Sandbox. The change goes through a pull
 # request with auto-merge (ADR-0011), so it merges only after the kubeconform
 # check passes. The script then waits for Argo CD to sync the merge commit and
-# for the Workload to report the failure that the Scenario describes.
+# for the Target to report the failure that the Scenario describes.
 set -euo pipefail
 
 # shellcheck source=hack/lib.sh
@@ -28,9 +28,9 @@ fi
 patch_file="$REPO_ROOT/scenarios/$scenario/inject.patch"
 [ -f "$patch_file" ] || die "unknown Scenario '$scenario': $patch_file does not exist. Scenarios: $(available_scenarios)"
 
-# workload is the Workload whose failure the Scenario injects, and alert is the
-# opted-in rule that the Workload raises. Scenarios 2 to 4 have no alert rule, so
-# alert is empty and their Triage is started by hand.
+# workload is the Target whose failure the Scenario injects, and alert is the
+# opted-in rule that the Target raises. Scenarios 2 to 4 have no alert rule, so
+# alert is empty and their Page is started by hand.
 workload=checkout
 alert=ContainerOOMKilled
 case "$scenario" in
@@ -116,7 +116,7 @@ merge_sha="$(gh pr view "$pr_url" --json mergeCommit --jq .mergeCommit.oid)"
 
 cd "$REPO_ROOT"
 echo "Merged as $merge_sha. Waiting for Argo CD to sync it."
-# The Workload is expected to be unhealthy after this sync, so only the sync is awaited.
+# The Target is expected to be unhealthy after this sync, so only the sync is awaited.
 wait_for_application sandbox "$merge_sha" 300 synced
 
 # wait_for_checkout waits until the checkout pods answer the query with a value
@@ -129,7 +129,7 @@ wait_for_checkout() {
 		if grep -qE "$pattern" <<<"$output"; then
 			return 0
 		fi
-		[ "$SECONDS" -lt "$deadline" ] || die "the checkout Workload did not report $observed within 8 minutes."
+		[ "$SECONDS" -lt "$deadline" ] || die "the checkout Target did not report $observed within 8 minutes."
 		sleep 5
 	done
 }
@@ -176,7 +176,8 @@ wait_for_alert() {
 	while :; do
 		alerts="$(kc get --raw "$alerts_path" 2>/dev/null || true)"
 		if grep -q "\"alertname\":\"$alertname\"" <<<"$alerts" &&
-			grep -q '"pagerless_triage":"true"' <<<"$alerts" &&
+			grep -q '"pagerless_page":"true"' <<<"$alerts" &&
+			grep -q '"pagerless.dev/watch":"true"' <<<"$alerts" &&
 			grep -q "\"deployment\":\"$workload\"" <<<"$alerts" &&
 			grep -q '"namespace":"sandbox"' <<<"$alerts"; then
 			return 0
@@ -193,7 +194,7 @@ unschedulable='{range .items[*]}{.status.conditions[?(@.type=="PodScheduled")].r
 case "$scenario" in
 oom | injection)
 	wait_for_checkout "$last_terminated" '^OOMKilled$' "OOMKilled"
-	echo "The checkout Workload reports OOMKilled."
+	echo "The checkout Target reports OOMKilled."
 	if [ "$scenario" = injection ]; then
 		wait_for_injected_log
 		echo "The checkout memory-holder log carries the injected instruction."
@@ -201,11 +202,11 @@ oom | injection)
 	;;
 bad-config)
 	wait_for_checkout "$waiting" '^CrashLoopBackOff$' "CrashLoopBackOff"
-	echo "The checkout Workload reports CrashLoopBackOff."
+	echo "The checkout Target reports CrashLoopBackOff."
 	;;
 bad-image-tag)
 	wait_for_checkout "$waiting" '^(ErrImagePull|ImagePullBackOff)$' "ErrImagePull or ImagePullBackOff"
-	echo "The checkout Workload reports a failed image pull."
+	echo "The checkout Target reports a failed image pull."
 	;;
 unschedulable)
 	wait_for_checkout "$unschedulable" '^Unschedulable$' "Unschedulable"
@@ -251,14 +252,14 @@ esac
 
 if [ -n "$alert" ]; then
 	wait_for_alert "$alert"
-	echo "The $alert alert is firing in Alertmanager for the $workload Workload."
+	echo "The $alert alert is firing in Alertmanager for the $workload Target."
 fi
 echo "The $scenario Scenario is injected."
 
 if [ -z "$alert" ]; then
 	cat <<EOF
-This Scenario has no opted-in alert rule, so start its Triage yourself:
-  kubectl --context kind-${KIND_CLUSTER_NAME} triage --namespace sandbox deploy/$workload
+This Scenario has no opted-in alert rule, so start its Page yourself:
+  kubectl --context kind-${KIND_CLUSTER_NAME} page --namespace sandbox deploy/$workload
 EOF
 fi
 echo "Restore the Sandbox with: make reset"
