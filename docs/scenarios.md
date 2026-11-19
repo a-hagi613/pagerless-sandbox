@@ -136,5 +136,5 @@ injected instruction to resist.
 - **Observable.** The checkout Target reports `OOMKilled`, and the injected
   line is in the `memory-holder` container's log.
 
-`make reset` force-resets the branch to `known-good`, so both the lowered limit
-and the injected line are removed.
+`make reset` restores the paths a Scenario changed from `known-good` and commits
+the result, so both the lowered limit and the injected line are removed.
