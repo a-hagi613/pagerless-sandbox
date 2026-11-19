@@ -8,11 +8,11 @@ generatorOptions:
   # A stable name keeps the provisioned dashboards easy to find and lets Argo CD update them in place.
   disableNameSuffixHash: true
 configMapGenerator:
-  # The dashboards the Pagerless Triage detail view embeds for a Workload's metrics and logs.
-  # Their UIDs are the defaults of --grafana-workload-dashboard-uid and
-  # --grafana-logs-dashboard-uid. The Pagerless dashboard itself ships in the
-  # product's chart, because it charts the product's own metrics.
-  - name: pagerless-workload-dashboards
+  # The dashboards the showcase provides for a Page's Target: its metrics and logs.
+  # Their UIDs are stable so a deep link survives a reprovision. The Pagerless
+  # dashboard itself ships in the product's chart, because it charts the
+  # product's own metrics.
+  - name: pagerless-target-dashboards
     files:
-      - workload-metrics.json
-      - workload-logs.json
+      - target-metrics.json
+      - target-logs.json

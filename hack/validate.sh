@@ -69,7 +69,7 @@ rendered_apps="$(helm template pagerless-apps "$REPO_ROOT/platform/apps" \
 	--set "platform.targetRevision=main" \
 	--set "sandbox.repoURL=https://github.com/a-hagi613/pagerless-sandbox" \
 	--set "sandbox.targetRevision=main")"
-for forbidden in pagerless-server pagerless-executor keycloak agentgateway gateway-api-crds mcp; do
+for forbidden in pagerless-server pagerless-executor agentgateway gateway-api-crds mcp; do
 	if printf '%s\n' "$rendered_apps" | grep -qE "^  name: ${forbidden}\$"; then
 		echo "error: platform/apps renders a ${forbidden} Application, which the product no longer ships." >&2
 		status=1
@@ -89,7 +89,7 @@ echo "Validating the CPU-stress experiment."
 validate -ignore-missing-schemas "$REPO_ROOT/scenarios/cpu/stresschaos.yaml"
 
 # A patch that no longer applies turns `make break` into a silent no-op, so each
-# one is proved against the Workload it changes.
+# one is proved against the Target it changes.
 echo "Checking every Scenario patch against workloads/."
 for patch in "$REPO_ROOT"/scenarios/*/inject.patch; do
 	if ! git -C "$REPO_ROOT" apply --check "$patch"; then

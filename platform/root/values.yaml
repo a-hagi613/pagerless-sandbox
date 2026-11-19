@@ -1,6 +1,6 @@
 # Rendered by hack/bootstrap-stack.sh, which sets every value with --set. The
 # defaults point at the main branch of this repository, which holds both the
-# platform's child Applications and the Sandbox Workloads.
+# platform's child Applications and the Sandbox Targets.
 platform:
   repoURL: https://github.com/a-hagi613/pagerless-sandbox
   targetRevision: main

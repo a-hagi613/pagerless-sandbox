@@ -1,5 +1,5 @@
 # Scenario 9 applies this object outside Git. A chaos experiment is a cluster
-# object, not a Sandbox commit, so the Workload's manifests stay at known-good
+# object, not a Sandbox commit, so the Target's manifests stay at known-good
 # and no Action on the menu can fix the failure (ADR-0019).
 apiVersion: chaos-mesh.org/v1alpha1
 kind: StressChaos

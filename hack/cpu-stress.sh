@@ -37,8 +37,8 @@ apply)
 	for id in $records; do
 		echo "  $id"
 	done
-	echo "The payment Workload is under CPU stress and its manifests are unchanged."
-	echo "Start the Triage with: kubectl triage --context kind-${KIND_CLUSTER_NAME} --namespace sandbox deploy/payment"
+	echo "The payment Target is under CPU stress and its manifests are unchanged."
+	echo "Start the Page with: kubectl page --context kind-${KIND_CLUSTER_NAME} --namespace sandbox deploy/payment"
 	echo "Remove the experiment with: make reset"
 	;;
 clear)

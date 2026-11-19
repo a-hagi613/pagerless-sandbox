@@ -5,11 +5,11 @@
 
 ## Context
 
-The OpenTelemetry Demo is distributed as a Helm chart, but the rendering path for PatchResources and Rollback patches plain manifest files at a Workload's `pagerless.dev/source-path`. Supporting Helm values would need a second rendering path that patches nested value paths, to be built, tested and secured for a single application.
+The OpenTelemetry Demo is distributed as a Helm chart, but the rendering path for PatchResources and Rollback patches plain manifest files at a Target's `pagerless.dev/source-path`. Supporting Helm values would need a second rendering path that patches nested value paths, to be built, tested and secured for a single application.
 
 ## Decision
 
-The Sandbox contains a trimmed subset of the OpenTelemetry Demo, limited to the services the Scenarios need, rendered once with `helm template` and committed as plain manifests. Each rendered Workload carries the `pagerless.dev/source-path` annotation like any other Sandbox Workload.
+The Sandbox contains a trimmed subset of the OpenTelemetry Demo, limited to the services the Scenarios need, rendered once with `helm template` and committed as plain manifests. Each rendered Target carries the `pagerless.dev/source-path` annotation like any other Sandbox Target.
 
 ## Consequences
 

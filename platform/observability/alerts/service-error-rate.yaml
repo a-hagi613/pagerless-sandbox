@@ -20,17 +20,19 @@ spec:
         # service.name, which every span carries. When a span carries k8s.namespace.name,
         # that namespace is preserved; otherwise it falls back to the Sandbox namespace.
         #
-        # Four Workloads report errors in the demo's known-good state, so a threshold over
+        # Four Targets report errors in the demo's known-good state, so a threshold over
         # them would fire continuously and never mean anything:
         # - frontend and frontend-proxy answer the recommendation and ad routes with an
         #   error, because ADR-0019 does not deploy those components;
         # - checkout and shipping report failures whenever the demo's own calls time out,
         #   which they do for part of the load generator's checkouts on a local cluster.
-        # The Scenarios' Workloads are error-free in the known-good state, so any error
+        # The Scenarios' Targets are error-free in the known-good state, so any error
         # rate from them is a fault.
         #
         # The ratio and the error rate are recorded so that the alert below stays readable;
         # both are evaluated from the moment the rule is deployed, with no history needed.
+        # Each recorded series carries namespace and deployment, so the receiver resolves
+        # the Target from the deployment label and never guesses.
         - record: pagerless:service_server_error_ratio:5m
           expr: |
             (
@@ -74,7 +76,7 @@ spec:
                 "namespace", "sandbox", "namespace", "^$"
               )
             )
-        # One percent of a Workload's server spans failing, at more than one error every
+        # One percent of a Target's server spans failing, at more than one error every
         # three minutes, is a real failure rather than a blip: a single error in a quiet
         # quarter of an hour is below both, and a flag that fails an operation reaches both
         # within a few minutes.
@@ -85,7 +87,11 @@ spec:
           for: 3m
           labels:
             severity: warning
-            pagerless_triage: "true"
+            # pagerless_page selects the alert for the Alertmanager route; it is
+            # not the product opt-in. pagerless.dev/watch is the v2 opt-in the
+            # receiver checks.
+            pagerless_page: "true"
+            pagerless.dev/watch: "true"
           annotations:
-            summary: A Workload's server spans are failing.
+            summary: A Target's server spans are failing.
             description: More than one percent of the server spans of Deployment {{ $labels.namespace }}/{{ $labels.deployment }} are failing, at more than one error every three minutes.

@@ -1,5 +1,5 @@
 apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
+kind: PodMonitor
 metadata:
   name: pagerless-server
   namespace: monitoring
@@ -7,13 +7,15 @@ metadata:
     app.kubernetes.io/name: pagerless-server
 spec:
   # The server runs in its own namespace, so the monitor names it explicitly.
+  # The v2 chart's Service exposes the Portal and the report API, not the metrics
+  # port, so the monitor scrapes the pod's own `metrics` container port.
   namespaceSelector:
     matchNames:
       - pagerless
   selector:
     matchLabels:
       app.kubernetes.io/name: pagerless-server
-  endpoints:
+  podMetricsEndpoints:
     - port: metrics
       path: /metrics
       interval: 30s

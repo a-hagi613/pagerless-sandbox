@@ -48,7 +48,7 @@ components:
           - sh
           - -c
           - until nc -z -v -w30 kafka 9092; do echo waiting for kafka; sleep 2; done;
-    # The oom Scenario holds more memory than the Workload's limit. The demo's
+    # The oom Scenario holds more memory than the Target's limit. The demo's
     # checkout service uses 32Mi, so the buffer lives in a second container of
     # the same pod. Its known-good request and limit are the ones that the
     # Scenario's injection patch lowers, and that Pagerless raises again.
