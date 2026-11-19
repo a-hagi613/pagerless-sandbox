@@ -32,8 +32,3 @@ output "karpenter_controller_role_arn" {
   description = "IAM role the Karpenter controller assumes through EKS Pod Identity."
   value       = module.karpenter.iam_role_arn
 }
-
-output "agent_role_arn" {
-  description = "IAM role the pagerless-agent Job assumes through EKS Pod Identity."
-  value       = aws_iam_role.agent_bedrock.arn
-}

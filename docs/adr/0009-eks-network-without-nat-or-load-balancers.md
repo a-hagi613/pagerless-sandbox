@@ -11,7 +11,7 @@ The cloud environment exists to demonstrate the stack on EKS at minimal cost. A 
 
 - Nodes run in public subnets, with security groups that permit no inbound traffic.
 - The dashboard and Grafana are reached through `kubectl port-forward`.
-- Bedrock is reached through its public endpoint.
+- The model endpoint is reached through its public endpoint.
 - Terraform state is stored in S3 with native lockfile locking.
 - The cluster is created and destroyed per session with `make cloud-up` and `make cloud-down`.
 

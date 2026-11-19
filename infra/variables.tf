@@ -5,7 +5,7 @@ variable "aws_account_id" {
 }
 
 variable "aws_region" {
-  description = "Region of every resource and of the Bedrock endpoint the agent calls."
+  description = "Region of every resource in the session."
   type        = string
   default     = "us-east-1"
 }
@@ -58,16 +58,4 @@ variable "system_instance_types" {
   description = "Instance types for the one Spot node that runs Karpenter, CoreDNS and Argo CD."
   type        = list(string)
   default     = ["t3.large"]
-}
-
-variable "bedrock_model_id" {
-  description = "Inference profile the agent calls. The US geo profile is the only way this account can reach Nova 2 Lite."
-  type        = string
-  default     = "us.amazon.nova-2-lite-v1:0"
-}
-
-variable "bedrock_foundation_model_id" {
-  description = "Foundation model behind that profile, as it appears in a cross-Region foundation-model ARN."
-  type        = string
-  default     = "amazon.nova-2-lite-v1:0"
 }

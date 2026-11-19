@@ -1,7 +1,7 @@
 # Public subnets only, with no NAT gateway and no load balancer (ADR-0009).
 #
 # Nodes are given public IPv4 addresses so that they can reach Amazon ECR,
-# Bedrock and the Kubernetes API without a NAT gateway. Nothing routes inbound:
+# Amazon ECR, the model endpoint and the Kubernetes API without a NAT gateway. Nothing routes inbound:
 # the node security group has no ingress rule, and no load balancer or public
 # endpoint is created here.
 
