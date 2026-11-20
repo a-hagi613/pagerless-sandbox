@@ -101,9 +101,11 @@ data "aws_iam_policy_document" "plan" {
       "iam:List*",
       "kms:Describe*",
       # A plan refreshes the cluster's KMS key, and reading the key needs its
-      # policy. Without this the plan fails with AccessDenied for exactly as long
-      # as a session is standing, which is when the plan matters most.
+      # policy and its rotation status. Without these the plan fails with
+      # AccessDenied for exactly as long as a session is standing, which is when
+      # the plan matters most.
       "kms:GetKeyPolicy",
+      "kms:GetKeyRotationStatus",
       "kms:List*",
       "logs:Describe*",
       "logs:ListTags*",
