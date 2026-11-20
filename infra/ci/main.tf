@@ -97,13 +97,22 @@ data "aws_iam_policy_document" "plan" {
       "ec2:Describe*",
       "eks:Describe*",
       "eks:List*",
+      # Karpenter's interruption rules are EventBridge rules, and a plan reads
+      # each one it manages. Like the KMS reads below, this only fails while a
+      # session is standing.
+      "events:DescribeRule",
+      "events:ListRules",
+      "events:ListTagsForResource",
+      "events:ListTargetsByRule",
       "iam:Get*",
       "iam:List*",
       "kms:Describe*",
       # A plan refreshes the cluster's KMS key, and reading the key needs its
-      # policy. Without this the plan fails with AccessDenied for exactly as long
-      # as a session is standing, which is when the plan matters most.
+      # policy and its rotation status. Without these the plan fails with
+      # AccessDenied for exactly as long as a session is standing, which is when
+      # the plan matters most.
       "kms:GetKeyPolicy",
+      "kms:GetKeyRotationStatus",
       "kms:List*",
       "logs:Describe*",
       "logs:ListTags*",
