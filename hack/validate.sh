@@ -95,9 +95,17 @@ validate -ignore-missing-schemas "$REPO_ROOT/scenarios/cpu/stresschaos.yaml"
 # already carries its own patch, and applying the others to it fails on the line
 # numbers that patch moved, which says nothing about whether they are stale.
 echo "Checking every Scenario patch against a clean base of workloads/."
-base_ref="${PAGERLESS_BASE_REF:-origin/main}"
+# The base is the branch this run is compared against. A shallow checkout has no
+# common ancestor to merge-base on, so the history is deepened first: without it
+# the comparison silently degrades to the working tree and a Scenario branch
+# fails on its own patch.
+base_branch="${GITHUB_BASE_REF:-main}"
+base_ref="${PAGERLESS_BASE_REF:-origin/${base_branch}}"
+if git -C "$REPO_ROOT" rev-parse --is-shallow-repository 2>/dev/null | grep -q true; then
+	git -C "$REPO_ROOT" fetch --quiet --unshallow origin 2>/dev/null || true
+fi
 if ! git -C "$REPO_ROOT" rev-parse --verify --quiet "$base_ref" >/dev/null; then
-	git -C "$REPO_ROOT" fetch --quiet --depth=50 origin "${base_ref#origin/}" || true
+	git -C "$REPO_ROOT" fetch --quiet --no-tags origin "${base_branch}" || true
 fi
 if base_commit="$(git -C "$REPO_ROOT" merge-base "$base_ref" HEAD 2>/dev/null)"; then
 	patch_root="$(mktemp -d)"
