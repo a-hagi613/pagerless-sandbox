@@ -90,21 +90,40 @@ echo "Validating the CPU-stress experiment."
 validate -ignore-missing-schemas "$REPO_ROOT/scenarios/cpu/stresschaos.yaml"
 
 # A patch that no longer applies turns `make break` into a silent no-op, so each
-# one is proved against the Target it changes. A Scenario branch is a tree that
-# already carries its own patch, so a patch that is present is accepted: it must
-# apply in reverse, which is the only way a patch can be both applied and
-# unaltered.
-echo "Checking every Scenario patch against workloads/."
-for patch in "$REPO_ROOT"/scenarios/*/inject.patch; do
-	if git -C "$REPO_ROOT" apply --check "$patch"; then
-		echo "  applies: ${patch#"$REPO_ROOT"/}"
-	elif git -C "$REPO_ROOT" apply --reverse --check "$patch"; then
-		echo "  already applied: ${patch#"$REPO_ROOT"/}"
-	else
-		echo "error: $patch does not apply to workloads/, and is not already applied." >&2
-		status=1
-	fi
-done
+# one is proved against the Target it changes. The patches are proved against a
+# clean export of the base branch, never against this checkout: a Scenario branch
+# already carries its own patch, and applying the others to it fails on the line
+# numbers that patch moved, which says nothing about whether they are stale.
+echo "Checking every Scenario patch against a clean base of workloads/."
+base_ref="${PAGERLESS_BASE_REF:-origin/main}"
+if ! git -C "$REPO_ROOT" rev-parse --verify --quiet "$base_ref" >/dev/null; then
+	git -C "$REPO_ROOT" fetch --quiet --depth=50 origin "${base_ref#origin/}" || true
+fi
+if base_commit="$(git -C "$REPO_ROOT" merge-base "$base_ref" HEAD 2>/dev/null)"; then
+	patch_root="$(mktemp -d)"
+	trap 'rm -rf "$patch_root"' EXIT
+	git -C "$REPO_ROOT" archive "$base_commit" workloads | tar -x -C "$patch_root"
+	for patch in "$REPO_ROOT"/scenarios/*/inject.patch; do
+		if patch --silent --dry-run --forward -p1 -d "$patch_root" <"$patch" >/dev/null 2>&1; then
+			echo "  applies: ${patch#"$REPO_ROOT"/}"
+		else
+			echo "error: $patch does not apply to workloads/ at ${base_commit:0:7}." >&2
+			status=1
+		fi
+	done
+else
+	echo "warning: no $base_ref to compare against; checking the working tree instead." >&2
+	for patch in "$REPO_ROOT"/scenarios/*/inject.patch; do
+		if git -C "$REPO_ROOT" apply --check "$patch"; then
+			echo "  applies: ${patch#"$REPO_ROOT"/}"
+		elif git -C "$REPO_ROOT" apply --reverse --check "$patch"; then
+			echo "  already applied: ${patch#"$REPO_ROOT"/}"
+		else
+			echo "error: $patch does not apply to workloads/." >&2
+			status=1
+		fi
+	done
+fi
 
 if [ "$status" -ne 0 ]; then
 	echo "Manifest validation failed." >&2
