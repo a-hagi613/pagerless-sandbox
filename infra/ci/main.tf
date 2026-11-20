@@ -97,6 +97,13 @@ data "aws_iam_policy_document" "plan" {
       "ec2:Describe*",
       "eks:Describe*",
       "eks:List*",
+      # Karpenter's interruption rules are EventBridge rules, and a plan reads
+      # each one it manages. Like the KMS reads below, this only fails while a
+      # session is standing.
+      "events:DescribeRule",
+      "events:ListRules",
+      "events:ListTagsForResource",
+      "events:ListTargetsByRule",
       "iam:Get*",
       "iam:List*",
       "kms:Describe*",
