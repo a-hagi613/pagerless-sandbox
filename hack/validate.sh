@@ -90,14 +90,19 @@ echo "Validating the CPU-stress experiment."
 validate -ignore-missing-schemas "$REPO_ROOT/scenarios/cpu/stresschaos.yaml"
 
 # A patch that no longer applies turns `make break` into a silent no-op, so each
-# one is proved against the Target it changes.
+# one is proved against the Target it changes. A Scenario branch is a tree that
+# already carries its own patch, so a patch that is present is accepted: it must
+# apply in reverse, which is the only way a patch can be both applied and
+# unaltered.
 echo "Checking every Scenario patch against workloads/."
 for patch in "$REPO_ROOT"/scenarios/*/inject.patch; do
-	if ! git -C "$REPO_ROOT" apply --check "$patch"; then
-		echo "error: $patch does not apply to workloads/." >&2
-		status=1
-	else
+	if git -C "$REPO_ROOT" apply --check "$patch"; then
 		echo "  applies: ${patch#"$REPO_ROOT"/}"
+	elif git -C "$REPO_ROOT" apply --reverse --check "$patch"; then
+		echo "  already applied: ${patch#"$REPO_ROOT"/}"
+	else
+		echo "error: $patch does not apply to workloads/, and is not already applied." >&2
+		status=1
 	fi
 done
 
